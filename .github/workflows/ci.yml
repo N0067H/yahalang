@@ -92,7 +92,7 @@ jobs:
         run: |
           mkdir -p package dist
           cp "target/$RUST_TARGET/release/yahalang$BINARY_SUFFIX" package/
-          cp README.md README_KO.md README_JP.md DESIGN.md package/
+          cp README.md README_EN.md README_JP.md DESIGN.md image.png package/
           cp -R examples package/
 
       - name: Package Unix binary

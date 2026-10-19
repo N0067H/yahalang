@@ -1,6 +1,14 @@
-# Yahalang
+<h1 align="center">Yahalang</h1>
 
-[English](README.md) | [한국어](README_KO.md) | [日本語](README_JP.md)
+<p align="center">
+  <img src="image.png" alt="『ちいかわ』のうさぎ" width="280">
+</p>
+
+<p align="center">
+  <a href="README_EN.md">English</a> ·
+  <a href="README.md">한국어</a> ·
+  <a href="README_JP.md">日本語</a>
+</p>
 
 Yahalangは『ちいかわ』のうさぎの発話をもとにした、スタック型の難解プログラミング言語です。
 英語・韓国語・日本語の命令表記、符号付き64ビット整数、変更可能な整数配列をサポートします。

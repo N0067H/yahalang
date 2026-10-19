@@ -1,26 +1,34 @@
-# Yahalang
+<h1 align="center">Yahalang</h1>
 
-[English](README.md) | [한국어](README_KO.md) | [日本語](README_JP.md)
+<p align="center">
+  <img src="image.png" alt="치이카와의 우사기" width="280">
+</p>
 
-Yahalang is a stack-based esoteric programming language inspired by Usagi's utterances in *Chiikawa*.
-It supports English, Korean, and Japanese command spellings, signed 64-bit integers, and mutable integer arrays.
+<p align="center">
+  <a href="README_EN.md">English</a> ·
+  <a href="README.md">한국어</a> ·
+  <a href="README_JP.md">日本語</a>
+</p>
 
-## Build and run
+Yahalang은 *치이카와*의 우사기 말소리에서 착안한 스택 기반 난해한 프로그래밍 언어입니다.
+영어, 한국어, 일본어 명령 표기와 부호 있는 64비트 정수, 수정 가능한 정수 배열을 지원합니다.
 
-Install Rust and Cargo, then run these commands from the repository root:
+## 빌드 및 실행
+
+Rust와 Cargo를 설치한 뒤 저장소 루트에서 실행합니다.
 
 ```sh
 cargo build
 cargo run -- run examples/hello_world.yaha --lang en
 ```
 
-Output:
+출력:
 
 ```text
 Hello, world!
 ```
 
-Start the REPL:
+REPL을 시작하려면 다음 명령을 실행합니다.
 
 ```sh
 cargo run -- repl --lang en
@@ -32,195 +40,191 @@ yaha> ura yahayaha i
 yaha> :q
 ```
 
-Each REPL entry runs as a separate program.
-Stack values and arrays do not persist between entries.
-Use `:q` or `:quit` to exit.
+REPL의 각 입력은 독립된 프로그램으로 실행됩니다.
+스택과 배열은 다음 입력으로 이어지지 않습니다.
+종료 명령은 `:q` 또는 `:quit`입니다.
 
-A source file runs as one program, with state shared across its lines.
+파일은 전체가 하나의 프로그램으로 실행되며, 줄 사이에 상태가 유지됩니다.
 
-The examples below use English spellings.
-An explicit `--lang en` overrides any saved default language.
+아래 예제는 영어 표기를 사용합니다.
+명시적으로 지정한 `--lang en`이 저장된 기본 언어보다 우선합니다.
 
-## Numbers and the stack
+## 숫자와 스택
 
-`ura` starts a number at zero.
-Each consecutive `yaha` increases it by one:
+`ura`는 0에서 숫자를 시작합니다.
+이어 붙인 `yaha` 하나마다 값이 1씩 증가합니다.
 
-| Source | Value |
+| 코드 | 값 |
 | --- | --- |
 | `ura` | 0 |
 | `ura yaha` | 1 |
 | `ura yahayaha` | 2 |
 | `ura yahayahayaha` | 3 |
 
-The `yaha` syllables within one number must be adjacent.
-A space ends the count.
-For example, `ura yaha yaha` pushes 1 and then performs addition; it does not push 2.
+한 숫자를 표현하는 `yaha`들은 서로 붙여 써야 합니다.
+공백은 세기를 끝내므로 `ura yaha yaha`는 2가 아니라 1을 넣은 뒤 덧셈을 실행합니다.
 
-This program pushes 1 and 2, adds them, and prints `3`:
+다음 코드는 1과 2를 스택에 넣고 더한 뒤 `3`을 출력합니다.
 
 ```text
 ura yaha ura yahayaha yaha i
 ```
 
-Binary operations consume the top two values and push the result.
-Subtraction, division, and remainder use the lower value as the left operand.
+이항 연산은 맨 위 두 값을 꺼내고 결과를 넣습니다.
+뺄셈, 나눗셈, 나머지 연산에서 아래 값이 왼쪽 피연산자입니다.
 
-Overflow, division by zero, and insufficient stack values are runtime errors.
+오버플로, 0으로 나누기, 스택 값 부족은 실행 오류입니다.
 
-## Commands
+## 명령
 
-| English | Korean | Japanese | Operation |
+| 영어 | 한국어 | 일본어 | 동작 |
 | --- | --- | --- | --- |
-| `ura` | `우라` | `ウラ` | Start an integer literal |
-| `yaha` / `yaha!` | `야하` / `야하!` | `ヤハ` / `ヤハ!` | Add / subtract |
-| `huung` | `후응` | `フゥン` | Multiply |
-| `hueung` | `후으응` | `フウン` | Integer division |
-| `jureuri` | `쥬르리` | `ジュルリ` | Remainder |
-| `fuun` | `후웅` | `フン` | Negate |
-| `puru` / `puru!` | `푸루` / `푸루!` | `プル` / `プル!` | Duplicate / discard the top value |
-| `haa?` | `하아?` | `ハァ?` | Execute the next instruction if the popped value is zero |
-| `puruya` / `puruya!` | `푸루야` / `푸루야!` | `プルャ` / `プルャ!` | Jump to a line / halt |
-| `ui` | `우이` | `ウイ` | Read an integer |
-| `i` | `이` | `イ` | Print an integer |
-| `ua` | `우아` | `ウア` | Print a Unicode character from its code point |
+| `ura` | `우라` | `ウラ` | 정수 리터럴 시작 |
+| `yaha` / `yaha!` | `야하` / `야하!` | `ヤハ` / `ヤハ!` | 덧셈 / 뺄셈 |
+| `huung` | `후응` | `フゥン` | 곱셈 |
+| `hueung` | `후으응` | `フウン` | 정수 나눗셈 |
+| `jureuri` | `쥬르리` | `ジュルリ` | 나머지 |
+| `fuun` | `후웅` | `フン` | 부호 반전 |
+| `puru` / `puru!` | `푸루` / `푸루!` | `プル` / `プル!` | 맨 위 값 복제 / 버리기 |
+| `haa?` | `하아?` | `ハァ?` | 꺼낸 값이 0이면 다음 명령 실행 |
+| `puruya` / `puruya!` | `푸루야` / `푸루야!` | `プルャ` / `プルャ!` | 줄 번호로 점프 / 종료 |
+| `ui` | `우이` | `ウイ` | 정수 입력 |
+| `i` | `이` | `イ` | 정수 출력 |
+| `ua` | `우아` | `ウア` | 코드 포인트로 유니코드 문자 하나 출력 |
 
-`haa?` consumes its condition and controls one instruction on the same line.
-Conditions may be nested up to 128 levels.
+`haa?`는 조건 값을 꺼내고 같은 줄의 다음 명령 하나를 조건부로 실행합니다.
+조건 중첩은 최대 128단계입니다.
 
-Jump targets start at line 1.
-Blank lines count toward line numbers.
+점프 대상 줄 번호는 1부터 시작하며 빈 줄도 셉니다.
 
-`i` and `ua` consume their operands and do not append a newline.
-The REPL adds a newline when needed to separate output from the next prompt.
+`i`와 `ua`는 피연산자를 꺼내고 출력하며, 자동으로 줄바꿈을 붙이지 않습니다.
+REPL은 출력과 다음 프롬프트를 구분하기 위해 필요한 줄바꿈을 추가합니다.
 
-There are no string literals, character literals, or comments.
+문자열 리터럴, 문자 리터럴, 주석 문법은 지원하지 않습니다.
 
-## Integer input
+## 정수 입력
 
-Each `ui` reads one complete line containing a single integer.
+`ui`는 한 줄 전체를 읽고, 그 줄에는 정수 하나만 있어야 합니다.
 
 ```sh
 cargo run -- run examples/add_two_numbers.yaha --lang en
 ```
 
-Enter `10`, press Enter, then enter `2` and press Enter again.
-The result is `12`.
+`10`을 입력하고 Enter를 누른 다음, `2`를 입력하고 다시 Enter를 누르면 `12`가 출력됩니다.
 
-Entering `10 2` on one line is invalid.
+`10 2`를 한 줄에 입력하면 오류가 발생합니다.
 
-Alternatively:
+파이프로 입력을 전달할 수도 있습니다.
 
 ```sh
 printf '10\n2\n' | cargo run -- run examples/add_two_numbers.yaha --lang en
 ```
 
-## Arrays
+## 배열
 
-Array literals use square brackets and comma-separated integer literals:
+대괄호 안에 정수 리터럴을 쉼표로 구분해 배열을 만듭니다.
 
 ```text
 [ura, ura yaha, ura yahayaha] ura yaha @ i
 ```
 
-This creates `[0, 1, 2]`, reads the element at index 1, and prints `1`.
-Indices start at zero.
+배열 `[0, 1, 2]`를 만들고 인덱스 1의 값을 읽어 `1`을 출력합니다.
+인덱스는 0부터 시작합니다.
 
-`[]` creates an empty array.
-Nested arrays are not supported.
+빈 배열은 `[]`이며, 중첩 배열은 지원하지 않습니다.
 
-| Command | Operand order, bottom to top | Result |
+| 명령 | 피연산자 순서: 스택 아래에서 위로 | 결과 |
 | --- | --- | --- |
-| `#` | array | Push the length |
-| `@` | array, index | Push the selected integer |
-| `=` | array, index, value | Update the selected element |
+| `#` | 배열 | 길이를 스택에 넣음 |
+| `@` | 배열, 인덱스 | 해당 정수를 스택에 넣음 |
+| `=` | 배열, 인덱스, 값 | 해당 원소를 수정 |
 
-All three commands consume their operands.
-Use `puru` to retain an array reference for later use.
-Duplicated references share the same array, so mutations are visible through every reference.
+세 명령은 모두 피연산자를 스택에서 꺼냅니다.
+배열을 다시 사용하려면 `puru`로 참조를 복제합니다.
+복제한 참조는 같은 배열을 공유하므로 수정 내용도 함께 보입니다.
 
-Invalid types and indices produce runtime errors.
+잘못된 타입이나 인덱스는 실행 오류를 발생시킵니다.
 
-## Language settings
+## 언어 설정
 
-Use `--lang en`, `--lang ko`, or `--lang ja` with `run` or `repl`.
-Use one spelling set consistently within a program.
+`run`과 `repl`에서 `--lang en`, `--lang ko`, `--lang ja`를 지정할 수 있습니다.
+한 프로그램에서는 한 언어의 표기를 사용합니다.
 
-Save a default language:
+기본 언어를 저장하려면 다음 명령을 실행합니다.
 
 ```sh
 cargo run -- set lang ko
 ```
 
-The setting is stored as TOML:
+설정은 TOML로 저장됩니다.
 
 ```toml
 lang = 'ko'
 ```
 
-| Platform | Configuration file |
+| 운영체제 | 설정 파일 |
 | --- | --- |
-| Linux | `$XDG_CONFIG_HOME/yahalang/config.toml`, or `~/.config/yahalang/config.toml` if unset |
+| Linux | `$XDG_CONFIG_HOME/yahalang/config.toml`, 변수가 없으면 `~/.config/yahalang/config.toml` |
 | macOS | `~/Library/Application Support/yahalang/config.toml` |
 | Windows | `%APPDATA%/yahalang/config.toml` |
 
-An explicit `--lang` takes precedence over the saved setting.
-Without either, English is used.
+실행 시 지정한 `--lang`이 저장된 설정보다 우선합니다.
+둘 다 없으면 영어를 사용합니다.
 
-## Errors
+## 오류 메시지
 
-The default `usagi` error style uses utterances such as `haa?`, `haa? haa?`, and `ui`.
+기본 오류 스타일인 `usagi`는 `haa?`, `haa? haa?`, `ui` 같은 말소리를 출력합니다.
 
-Select `friendly` to see the cause:
+원인을 확인하려면 `friendly`를 지정합니다.
 
 ```sh
 cargo run -- repl --lang en --error-style friendly
 ```
 
-Entering `yaha` on an empty stack reports:
+빈 스택에서 `yaha`를 입력하면 다음 오류가 표시됩니다.
 
 ```text
 runtime error at line 1, instruction 1: stack underflow
 ```
 
-The `--error-style usagi|friendly` option is available for both `run` and `repl`.
+`--error-style usagi|friendly`는 `run`과 `repl`에서 모두 사용할 수 있습니다.
 
-## CI and releases
+## CI와 릴리스
 
-GitHub Actions checks formatting, runs tests in the release profile, and builds binaries for
-Linux x86-64, Windows x86-64, and macOS Apple Silicon (aarch64).
-The workflow runs on pull requests, pushes to `master`, version tags, and manual dispatches.
-Download build archives from the workflow's Artifacts section.
+GitHub Actions에서 포맷 검사와 release 프로필 테스트를 실행하고,
+Linux x86-64, Windows x86-64, macOS Apple Silicon(aarch64)용 바이너리를 빌드합니다.
+PR, `master` 푸시, 버전 태그 푸시, 수동 실행으로 워크플로를 시작할 수 있습니다.
+빌드한 압축 파일은 워크플로의 Artifacts에서 내려받을 수 있습니다.
 
-To publish a release, update the version in `Cargo.toml` and `Cargo.lock`, then commit and push the changes.
-Push a matching version tag:
+릴리스를 배포하려면 `Cargo.toml`과 `Cargo.lock`의 버전을 갱신하고 변경 사항을 커밋해 푸시합니다.
+이어서 버전과 일치하는 태그를 푸시합니다.
 
 ```sh
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Replace `0.1.0` with the package version.
-The tag must match `v` followed by the version in `Cargo.toml`.
-After all builds pass, the workflow creates a GitHub Release with platform archives and `SHA256SUMS`.
-Tags with prerelease versions, such as `v0.2.0-beta.1`, create prereleases.
-Manual workflow runs build artifacts without publishing a release.
+`0.1.0`은 배포할 패키지 버전으로 바꿉니다.
+태그는 `v` 뒤에 `Cargo.toml`의 버전을 붙인 값과 일치해야 합니다.
+모든 빌드가 성공하면 플랫폼별 압축 파일과 `SHA256SUMS`를 첨부한 GitHub Release를 생성합니다.
+`v0.2.0-beta.1` 같은 사전 배포 버전 태그는 프리릴리스를 생성합니다.
+수동 실행은 릴리스 배포 없이 빌드 아티팩트만 생성합니다.
 
-## Examples
+## 예제
 
-| File | Behavior |
+| 파일 | 동작 |
 | --- | --- |
-| [hello_world.yaha](examples/hello_world.yaha) | Print `Hello, world!` |
-| [add_two_numbers.yaha](examples/add_two_numbers.yaha) | Read two integers on separate lines and print their sum |
-| [integer_echo.yaha](examples/integer_echo.yaha) | Read and print one integer |
-| [array_access.yaha](examples/array_access.yaha) | Update and read an array element |
-| [truth_machine.yaha](examples/truth_machine.yaha) | Print `0` once and halt, or print `1` indefinitely |
+| [hello_world.yaha](examples/hello_world.yaha) | `Hello, world!` 출력 |
+| [add_two_numbers.yaha](examples/add_two_numbers.yaha) | 정수 두 개를 별도 줄로 입력받아 합 출력 |
+| [integer_echo.yaha](examples/integer_echo.yaha) | 정수 하나를 입력받아 그대로 출력 |
+| [array_access.yaha](examples/array_access.yaha) | 배열 원소를 수정하고 조회 |
+| [truth_machine.yaha](examples/truth_machine.yaha) | `0`을 한 번 출력하고 종료하거나 `1`을 계속 출력 |
 
-For `truth_machine.yaha`, enter `0` or `1`.
-Stop the repeating output with Ctrl-C.
+`truth_machine.yaha`에는 `0` 또는 `1`을 입력합니다.
+반복 출력은 Ctrl-C로 중단합니다.
 
-See [DESIGN.md](DESIGN.md) for the language design.
+언어 설계는 [DESIGN.md](DESIGN.md)를 참고하세요.
 
-Run the test suite with `cargo test`.
+테스트는 `cargo test`로 실행합니다.
 
-> Listen to [this song](https://www.youtube.com/watch?v=wFOjWCLPDDM) while coding for x10000 efficiency.
+> [이 노래](https://www.youtube.com/watch?v=wFOjWCLPDDM)를 들으면서 하면 효율 x10000
