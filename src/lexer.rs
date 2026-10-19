@@ -91,6 +91,30 @@ impl<'a> Lexer<'a> {
                 self.offset += 1;
                 TokenKind::Question
             }
+            '[' => {
+                self.offset += 1;
+                TokenKind::LeftBracket
+            }
+            ']' => {
+                self.offset += 1;
+                TokenKind::RightBracket
+            }
+            ',' => {
+                self.offset += 1;
+                TokenKind::Comma
+            }
+            '@' => {
+                self.offset += 1;
+                TokenKind::At
+            }
+            '=' => {
+                self.offset += 1;
+                TokenKind::Equal
+            }
+            '#' => {
+                self.offset += 1;
+                TokenKind::Hash
+            }
             _ => {
                 if let Some((kind, spelling)) = Self::matching_utterance(rest, self.language) {
                     self.offset += spelling.len();
@@ -193,6 +217,25 @@ mod tests {
         assert_eq!(tokens[4].kind, TokenKind::Newline);
         assert_eq!(tokens[4].span, Span { start: 14, end: 16 });
         assert_eq!(tokens[5].kind, TokenKind::Eof);
+    }
+
+    #[test]
+    fn lexes_array_punctuation() {
+        assert_eq!(
+            kinds("[ura, ura yaha] # @ =", Language::English),
+            vec![
+                TokenKind::LeftBracket,
+                TokenKind::Ura,
+                TokenKind::Comma,
+                TokenKind::Ura,
+                TokenKind::Yaha,
+                TokenKind::RightBracket,
+                TokenKind::Hash,
+                TokenKind::At,
+                TokenKind::Equal,
+                TokenKind::Eof,
+            ]
+        );
     }
 
     #[test]

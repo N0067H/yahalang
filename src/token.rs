@@ -9,6 +9,12 @@ macro_rules! define_token_kinds {
             $($kind,)+
             Bang,
             Question,
+            LeftBracket,
+            RightBracket,
+            Comma,
+            At,
+            Equal,
+            Hash,
             HorizontalWhitespace,
             Newline,
             Eof,
@@ -26,6 +32,12 @@ macro_rules! define_token_kinds {
                     )+
                     Self::Bang => Some("!"),
                     Self::Question => Some("?"),
+                    Self::LeftBracket => Some("["),
+                    Self::RightBracket => Some("]"),
+                    Self::Comma => Some(","),
+                    Self::At => Some("@"),
+                    Self::Equal => Some("="),
+                    Self::Hash => Some("#"),
                     Self::HorizontalWhitespace | Self::Newline | Self::Eof => None,
                 }
             }

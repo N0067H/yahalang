@@ -3,6 +3,12 @@ use std::io::{BufRead, Write};
 use crate::parser::{Instruction, Program};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+enum Value {
+    Integer(i64),
+    Array(usize),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeError {
     pub line: usize,
     pub instruction: usize,
@@ -45,6 +51,7 @@ pub fn execute<R: BufRead, W: Write>(
     output: &mut W,
 ) -> Result<(), RuntimeError> {
     let mut stack = Vec::new();
+    let mut arrays = Vec::new();
     let mut line_index = 0;
 
     while line_index < program.lines.len() {
@@ -55,6 +62,7 @@ pub fn execute<R: BufRead, W: Write>(
             let flow = execute_instruction(
                 instruction,
                 &mut stack,
+                &mut arrays,
                 input,
                 output,
                 program.lines.len(),
@@ -83,7 +91,8 @@ pub fn execute<R: BufRead, W: Write>(
 
 fn execute_instruction<R: BufRead, W: Write>(
     instruction: &Instruction,
-    stack: &mut Vec<i64>,
+    stack: &mut Vec<Value>,
+    arrays: &mut Vec<Vec<i64>>,
     input: &mut R,
     output: &mut W,
     line_count: usize,
@@ -97,25 +106,28 @@ fn execute_instruction<R: BufRead, W: Write>(
     };
 
     match instruction {
-        Instruction::Push(value) => stack.push(*value),
+        Instruction::Push(value) => stack.push(Value::Integer(*value)),
         Instruction::Add => binary(stack, BinaryOperation::Add).map_err(error)?,
         Instruction::Subtract => binary(stack, BinaryOperation::Subtract).map_err(error)?,
         Instruction::Multiply => binary(stack, BinaryOperation::Multiply).map_err(error)?,
         Instruction::Divide => binary(stack, BinaryOperation::Divide).map_err(error)?,
         Instruction::Remainder => binary(stack, BinaryOperation::Remainder).map_err(error)?,
         Instruction::Negate => {
-            let value = *stack
+            let value = stack
                 .last()
-                .ok_or_else(|| error("stack underflow".to_owned()))?;
+                .ok_or_else(|| error("stack underflow".to_owned()))?
+                .as_integer()
+                .map_err(error)?;
             let result = value
                 .checked_neg()
                 .ok_or_else(|| error("arithmetic overflow".to_owned()))?;
-            *stack.last_mut().expect("top value was checked") = result;
+            *stack.last_mut().expect("top value was checked") = Value::Integer(result);
         }
         Instruction::Duplicate => {
-            let value = *stack
+            let value = stack
                 .last()
-                .ok_or_else(|| error("stack underflow".to_owned()))?;
+                .ok_or_else(|| error("stack underflow".to_owned()))?
+                .clone();
             stack.push(value);
         }
         Instruction::Discard => {
@@ -124,13 +136,12 @@ fn execute_instruction<R: BufRead, W: Write>(
                 .ok_or_else(|| error("stack underflow".to_owned()))?;
         }
         Instruction::Conditional(body) => {
-            let condition = stack
-                .pop()
-                .ok_or_else(|| error("stack underflow".to_owned()))?;
+            let condition = pop_integer(stack).map_err(error)?;
             if condition == 0 {
                 return execute_instruction(
                     body,
                     stack,
+                    arrays,
                     input,
                     output,
                     line_count,
@@ -140,9 +151,7 @@ fn execute_instruction<R: BufRead, W: Write>(
             }
         }
         Instruction::Jump => {
-            let target = stack
-                .pop()
-                .ok_or_else(|| error("stack underflow".to_owned()))?;
+            let target = pop_integer(stack).map_err(error)?;
             if target < 1 || target > line_count as i64 {
                 return Err(error(format!(
                     "jump target {target} is outside 1..={line_count}"
@@ -151,20 +160,16 @@ fn execute_instruction<R: BufRead, W: Write>(
             return Ok(Flow::Jump(target as usize));
         }
         Instruction::Halt => return Ok(Flow::Halt),
-        Instruction::ReadInteger => stack.push(read_integer(input).map_err(error)?),
+        Instruction::ReadInteger => stack.push(Value::Integer(read_integer(input).map_err(error)?)),
         Instruction::PrintInteger => {
-            let value = stack
-                .pop()
-                .ok_or_else(|| error("stack underflow".to_owned()))?;
+            let value = pop_integer(stack).map_err(error)?;
             write!(output, "{value}").map_err(|err| error(format!("output failed: {err}")))?;
             output
                 .flush()
                 .map_err(|err| error(format!("output flush failed: {err}")))?;
         }
         Instruction::PrintCharacter => {
-            let value = stack
-                .pop()
-                .ok_or_else(|| error("stack underflow".to_owned()))?;
+            let value = pop_integer(stack).map_err(error)?;
             let codepoint = u32::try_from(value)
                 .ok()
                 .and_then(char::from_u32)
@@ -174,21 +179,85 @@ fn execute_instruction<R: BufRead, W: Write>(
                 .flush()
                 .map_err(|err| error(format!("output flush failed: {err}")))?;
         }
+        Instruction::ArrayLiteral(values) => {
+            let array_id = arrays.len();
+            arrays.push(values.clone());
+            stack.push(Value::Array(array_id));
+        }
+        Instruction::ArrayGet => {
+            let index = pop_integer(stack).map_err(error)?;
+            let array_id = pop_array(stack).map_err(error)?;
+            let index = usize::try_from(index)
+                .map_err(|_| error(format!("array index {index} is out of bounds")))?;
+            let value = arrays
+                .get(array_id)
+                .and_then(|array| array.get(index))
+                .copied()
+                .ok_or_else(|| error(format!("array index {index} is out of bounds")))?;
+            stack.push(Value::Integer(value));
+        }
+        Instruction::ArraySet => {
+            let value = pop_integer(stack).map_err(error)?;
+            let index = pop_integer(stack).map_err(error)?;
+            let array_id = pop_array(stack).map_err(error)?;
+            let index = usize::try_from(index)
+                .map_err(|_| error(format!("array index {index} is out of bounds")))?;
+            let element = arrays
+                .get_mut(array_id)
+                .and_then(|array| array.get_mut(index))
+                .ok_or_else(|| error(format!("array index {index} is out of bounds")))?;
+            *element = value;
+        }
+        Instruction::ArrayLength => {
+            let array_id = pop_array(stack).map_err(error)?;
+            let length = arrays
+                .get(array_id)
+                .ok_or_else(|| error("invalid array reference".to_owned()))?
+                .len();
+            stack.push(Value::Integer(length as i64));
+        }
     }
 
     Ok(Flow::Continue)
 }
 
-fn binary(stack: &mut Vec<i64>, operation: BinaryOperation) -> Result<(), String> {
-    let right = *stack.last().ok_or_else(|| "stack underflow".to_owned())?;
-    let left = *stack
+fn pop_integer(stack: &mut Vec<Value>) -> Result<i64, String> {
+    match stack.pop().ok_or_else(|| "stack underflow".to_owned())? {
+        Value::Integer(value) => Ok(value),
+        Value::Array(_) => Err("expected an integer but found an array".to_owned()),
+    }
+}
+
+fn pop_array(stack: &mut Vec<Value>) -> Result<usize, String> {
+    match stack.pop().ok_or_else(|| "stack underflow".to_owned())? {
+        Value::Array(id) => Ok(id),
+        Value::Integer(_) => Err("expected an array but found an integer".to_owned()),
+    }
+}
+
+impl Value {
+    fn as_integer(&self) -> Result<i64, String> {
+        match self {
+            Self::Integer(value) => Ok(*value),
+            Self::Array(_) => Err("expected an integer but found an array".to_owned()),
+        }
+    }
+}
+
+fn binary(stack: &mut Vec<Value>, operation: BinaryOperation) -> Result<(), String> {
+    let right = stack
+        .last()
+        .ok_or_else(|| "stack underflow".to_owned())?
+        .as_integer()?;
+    let left = stack
         .get(
             stack
                 .len()
                 .checked_sub(2)
                 .ok_or_else(|| "stack underflow".to_owned())?,
         )
-        .ok_or_else(|| "stack underflow".to_owned())?;
+        .ok_or_else(|| "stack underflow".to_owned())?
+        .as_integer()?;
 
     if matches!(
         operation,
@@ -207,7 +276,7 @@ fn binary(stack: &mut Vec<i64>, operation: BinaryOperation) -> Result<(), String
     }
     .ok_or_else(|| "arithmetic overflow".to_owned())?;
     stack.truncate(stack.len() - 2);
-    stack.push(result);
+    stack.push(Value::Integer(result));
     Ok(())
 }
 
@@ -260,6 +329,40 @@ mod tests {
         assert_eq!(
             run("ura yahayaha ura yahayaha huung i", ""),
             (Ok(()), "4".to_owned())
+        );
+    }
+
+    #[test]
+    fn creates_reads_writes_and_measures_integer_arrays() {
+        assert_eq!(
+            run("[ura, ura yaha, ura yahayaha] # i", ""),
+            (Ok(()), "3".to_owned())
+        );
+        assert_eq!(
+            run(
+                "[ura, ura yaha] puru ura yaha ura yahayaha = ura yaha @ i",
+                ""
+            ),
+            (Ok(()), "2".to_owned())
+        );
+        assert_eq!(run("[ura yahayaha] ura @ i", ""), (Ok(()), "2".to_owned()));
+    }
+
+    #[test]
+    fn array_access_checks_types_and_bounds() {
+        assert!(
+            run("[ura] ura yaha @", "")
+                .0
+                .unwrap_err()
+                .message
+                .contains("out of bounds")
+        );
+        assert!(
+            run("[ura] ura yaha =", "")
+                .0
+                .unwrap_err()
+                .message
+                .contains("expected an integer")
         );
     }
 

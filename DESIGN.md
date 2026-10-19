@@ -65,6 +65,30 @@ phonetic transcriptions.
 Use one language's spellings consistently in a program. Punctuation stays
 ASCII (`!` and `?`) in every spelling set.
 
+## Integer arrays
+
+Square brackets create an array of integer values. Separate items with commas;
+each item uses the normal `ura` number form. `[]` creates an empty array.
+
+```text
+[ura, ura yaha, ura yahayaha]
+```
+
+This creates `[0, 1, 2]` and pushes an array reference onto the stack. Arrays
+are zero-indexed. `#` consumes an array reference and pushes its length. `@`
+consumes an array reference followed by an index and pushes the selected
+integer. `=` consumes an array reference, an index, and a value, then stores
+the value at that position. Duplicate an array reference with `puru` when it
+needs to be used again:
+
+```text
+[ura, ura yaha] puru ura yaha ura yahayaha = ura yaha @ i
+```
+
+This changes element 1 to 2 and prints it. Using a non-array where an array is
+required, or an index outside the array, stops the program with an error.
+Array literals currently contain integers; nested arrays are not supported.
+
 ## What the commands do
 
 `yaha` adds the top two numbers. `yaha!` subtracts the top number from the

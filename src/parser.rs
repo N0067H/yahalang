@@ -22,6 +22,10 @@ pub enum Instruction {
     ReadInteger,
     PrintInteger,
     PrintCharacter,
+    ArrayLiteral(Vec<i64>),
+    ArrayGet,
+    ArraySet,
+    ArrayLength,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -139,8 +143,46 @@ impl<'a> Parser<'a> {
             TokenKind::Ui => self.consume(Instruction::ReadInteger),
             TokenKind::I => self.consume(Instruction::PrintInteger),
             TokenKind::Ua => self.consume(Instruction::PrintCharacter),
+            TokenKind::LeftBracket => self.parse_array_literal(),
+            TokenKind::At => self.consume(Instruction::ArrayGet),
+            TokenKind::Equal => self.consume(Instruction::ArraySet),
+            TokenKind::Hash => self.consume(Instruction::ArrayLength),
             _ => Err(self.unexpected("instruction")),
         }
+    }
+
+    fn parse_array_literal(&mut self) -> Result<Instruction, ParseError> {
+        self.advance();
+        self.skip_horizontal_whitespace();
+
+        let mut values = Vec::new();
+        if self.at(TokenKind::RightBracket) {
+            self.advance();
+            return Ok(Instruction::ArrayLiteral(values));
+        }
+
+        loop {
+            if !self.at(TokenKind::Ura) {
+                return Err(self.unexpected("array integer"));
+            }
+            let Instruction::Push(value) = self.parse_number()? else {
+                unreachable!("parse_number always returns Push")
+            };
+            values.push(value);
+            self.skip_horizontal_whitespace();
+
+            if self.at(TokenKind::RightBracket) {
+                self.advance();
+                break;
+            }
+            if !self.at(TokenKind::Comma) {
+                return Err(self.unexpected("`,` or `]`"));
+            }
+            self.advance();
+            self.skip_horizontal_whitespace();
+        }
+
+        Ok(Instruction::ArrayLiteral(values))
     }
 
     fn parse_number(&mut self) -> Result<Instruction, ParseError> {
@@ -291,6 +333,31 @@ mod tests {
                 Instruction::Halt
             ]]
         );
+    }
+
+    #[test]
+    fn parses_integer_array_literals_and_operations() {
+        assert_eq!(
+            parse_english("[ura yaha, ura yahayaha, ura] # ura yaha @ =").lines,
+            vec![vec![
+                Instruction::ArrayLiteral(vec![1, 2, 0]),
+                Instruction::ArrayLength,
+                Instruction::Push(1),
+                Instruction::ArrayGet,
+                Instruction::ArraySet,
+            ]]
+        );
+        assert_eq!(
+            parse_english("[]").lines,
+            vec![vec![Instruction::ArrayLiteral(vec![])]]
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_array_literals() {
+        assert!(parse(&lex("[ura,]", Language::English).unwrap()).is_err());
+        assert!(parse(&lex("[ura ura]", Language::English).unwrap()).is_err());
+        assert!(parse(&lex("[", Language::English).unwrap()).is_err());
     }
 
     #[test]
