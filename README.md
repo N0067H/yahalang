@@ -185,6 +185,27 @@ runtime error at line 1, instruction 1: stack underflow
 
 The `--error-style usagi|friendly` option is available for both `run` and `repl`.
 
+## CI and releases
+
+GitHub Actions checks formatting, runs tests in the release profile, and builds binaries for
+Linux x86-64, Windows x86-64, and macOS Apple Silicon (aarch64).
+The workflow runs on pull requests, pushes to `master`, version tags, and manual dispatches.
+Download build archives from the workflow's Artifacts section.
+
+To publish a release, update the version in `Cargo.toml` and `Cargo.lock`, then commit and push the changes.
+Push a matching version tag:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Replace `0.1.0` with the package version.
+The tag must match `v` followed by the version in `Cargo.toml`.
+After all builds pass, the workflow creates a GitHub Release with platform archives and `SHA256SUMS`.
+Tags with prerelease versions, such as `v0.2.0-beta.1`, create prereleases.
+Manual workflow runs build artifacts without publishing a release.
+
 ## Examples
 
 | File | Behavior |

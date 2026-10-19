@@ -181,6 +181,27 @@ runtime error at line 1, instruction 1: stack underflow
 
 `--error-style usagi|friendly`는 `run`과 `repl`에서 모두 사용할 수 있습니다.
 
+## CI와 릴리스
+
+GitHub Actions에서 포맷 검사와 release 프로필 테스트를 실행하고,
+Linux x86-64, Windows x86-64, macOS Apple Silicon(aarch64)용 바이너리를 빌드합니다.
+PR, `master` 푸시, 버전 태그 푸시, 수동 실행으로 워크플로를 시작할 수 있습니다.
+빌드한 압축 파일은 워크플로의 Artifacts에서 내려받을 수 있습니다.
+
+릴리스를 배포하려면 `Cargo.toml`과 `Cargo.lock`의 버전을 갱신하고 변경 사항을 커밋해 푸시합니다.
+이어서 버전과 일치하는 태그를 푸시합니다.
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+`0.1.0`은 배포할 패키지 버전으로 바꿉니다.
+태그는 `v` 뒤에 `Cargo.toml`의 버전을 붙인 값과 일치해야 합니다.
+모든 빌드가 성공하면 플랫폼별 압축 파일과 `SHA256SUMS`를 첨부한 GitHub Release를 생성합니다.
+`v0.2.0-beta.1` 같은 사전 배포 버전 태그는 프리릴리스를 생성합니다.
+수동 실행은 릴리스 배포 없이 빌드 아티팩트만 생성합니다.
+
 ## 예제
 
 | 파일 | 동작 |

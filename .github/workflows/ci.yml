@@ -1,0 +1,149 @@
+name: CI and release
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Check formatting and version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt
+
+      - name: Check formatting
+        run: cargo +stable fmt --all -- --check
+
+      - name: Read and validate version
+        id: version
+        shell: bash
+        run: |
+          version="$(cargo +stable metadata --locked --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "yahalang") | .version')"
+          if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            printf 'Tag %s does not match Cargo.toml version v%s\n' "$GITHUB_REF_NAME" "$version" >&2
+            exit 1
+          fi
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: check
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            suffix: ""
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            suffix: ".exe"
+          - os: macos-15
+            target: aarch64-apple-darwin
+            suffix: ""
+    defaults:
+      run:
+        shell: bash
+    env:
+      RUST_TARGET: ${{ matrix.target }}
+      BINARY_SUFFIX: ${{ matrix.suffix }}
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --target "$RUST_TARGET"
+
+      - name: Test release profile
+        run: cargo +stable test --locked --release --target "$RUST_TARGET"
+
+      - name: Build release binary
+        run: cargo +stable build --locked --release --target "$RUST_TARGET"
+
+      - name: Check release binary
+        run: '"target/$RUST_TARGET/release/yahalang$BINARY_SUFFIX" --version'
+
+      - name: Stage package
+        run: |
+          mkdir -p package dist
+          cp "target/$RUST_TARGET/release/yahalang$BINARY_SUFFIX" package/
+          cp README.md README_KO.md README_JP.md DESIGN.md package/
+          cp -R examples package/
+
+      - name: Package Unix binary
+        if: runner.os != 'Windows'
+        run: tar -czf "dist/yahalang-$VERSION-$RUST_TARGET.tar.gz" -C package .
+
+      - name: Package Windows binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path package/* -DestinationPath "dist/yahalang-$($env:VERSION)-$($env:RUST_TARGET).zip"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: yahalang-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+          compression-level: 0
+
+  publish:
+    name: Publish GitHub Release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: yahalang-*
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        working-directory: dist
+        run: sha256sum *.tar.gz *.zip > SHA256SUMS
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          if gh release view "$TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --repo "$GH_REPO" --clobber
+          else
+            options=(--verify-tag --generate-notes --title "$TAG")
+            if [[ "$TAG" == *-* ]]; then
+              options+=(--prerelease)
+            fi
+            gh release create "$TAG" dist/* --repo "$GH_REPO" "${options[@]}"
+          fi

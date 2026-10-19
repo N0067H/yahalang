@@ -183,6 +183,27 @@ runtime error at line 1, instruction 1: stack underflow
 
 `--error-style usagi|friendly` は `run` と `repl` の両方で使用できます。
 
+## CIとリリース
+
+GitHub Actionsでフォーマットの検査とreleaseプロファイルでのテストを実行し、
+Linux x86-64、Windows x86-64、macOS Apple Silicon（aarch64）向けのバイナリをビルドします。
+PR、`master`へのプッシュ、バージョンタグのプッシュ、手動実行でワークフローを開始できます。
+ビルドしたアーカイブはワークフローのArtifactsからダウンロードできます。
+
+リリースするには、`Cargo.toml`と`Cargo.lock`のバージョンを更新し、変更をコミットしてプッシュします。
+続いて、バージョンに一致するタグをプッシュします。
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+`0.1.0`は公開するパッケージのバージョンに置き換えてください。
+タグは`v`の後に`Cargo.toml`のバージョンを付けた値と一致する必要があります。
+すべてのビルドが成功すると、各プラットフォームのアーカイブと`SHA256SUMS`を添付したGitHub Releaseを作成します。
+`v0.2.0-beta.1`などのプレリリースバージョンのタグは、プレリリースを作成します。
+手動実行ではリリースを公開せず、ビルドのアーティファクトのみを作成します。
+
 ## サンプル
 
 | ファイル | 動作 |
