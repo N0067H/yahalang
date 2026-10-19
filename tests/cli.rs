@@ -81,6 +81,32 @@ fn errors_keep_source_locations_and_use_the_playful_voice() {
 }
 
 #[test]
+fn repl_can_show_friendly_runtime_error_details() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_yahalang"))
+        .args(["repl", "--lang", "en", "--error-style", "friendly"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("start yahalang repl with friendly errors");
+    child
+        .stdin
+        .take()
+        .expect("stdin is piped")
+        .write_all(b"yaha\n:q\n")
+        .expect("write REPL commands");
+
+    let output = child.wait_with_output().expect("wait for yahalang repl");
+
+    assert!(output.status.success());
+    assert!(
+        String::from_utf8(output.stderr)
+            .unwrap()
+            .contains("runtime error at line 1, instruction 1: stack underflow")
+    );
+}
+
+#[test]
 fn set_language_persists_in_config_and_cli_option_overrides_it() {
     let sequence = NEXT_FILE.fetch_add(1, Ordering::Relaxed);
     let config_dir = std::env::temp_dir().join(format!(

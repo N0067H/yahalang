@@ -22,12 +22,16 @@ enum Command {
     Repl {
         #[arg(long, value_enum)]
         lang: Option<CliLanguage>,
+        #[arg(long, value_enum, default_value = "usagi")]
+        error_style: ErrorStyle,
     },
     #[command(about = "Run a program from a source file")]
     Run {
         file: PathBuf,
         #[arg(long, value_enum)]
         lang: Option<CliLanguage>,
+        #[arg(long, value_enum, default_value = "usagi")]
+        error_style: ErrorStyle,
     },
     #[command(about = "Save a default setting")]
     Set {
@@ -42,6 +46,13 @@ enum CliLanguage {
     En,
     Ko,
     Ja,
+}
+
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+enum ErrorStyle {
+    #[default]
+    Usagi,
+    Friendly,
 }
 
 impl CliLanguage {
@@ -66,9 +77,9 @@ impl From<CliLanguage> for Language {
 
 fn main() -> ExitCode {
     match Cli::parse().command {
-        Command::Repl { lang } => match selected_language(lang)
+        Command::Repl { lang, error_style } => match selected_language(lang)
             .map_err(io::Error::other)
-            .and_then(repl)
+            .and_then(|language| repl(language, error_style))
         {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
@@ -76,8 +87,14 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
-        Command::Run { file, lang } => {
-            match selected_language(lang).and_then(|language| run_file(&file, language)) {
+        Command::Run {
+            file,
+            lang,
+            error_style,
+        } => {
+            match selected_language(lang)
+                .and_then(|language| run_file(&file, language, error_style))
+            {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(error) => {
                     eprintln!("{}: {error}", file.display());
@@ -222,16 +239,17 @@ fn default_config_dir() -> Result<PathBuf, String> {
     }
 }
 
-fn run_file(file: &PathBuf, language: Language) -> Result<(), String> {
+fn run_file(file: &PathBuf, language: Language, error_style: ErrorStyle) -> Result<(), String> {
     let source = fs::read_to_string(file).map_err(|error| error.to_string())?;
-    let program = compile(&source, language)?;
+    let program = compile(&source, language, error_style)?;
     let stdin = io::stdin();
     let stdout = io::stdout();
 
-    execute(&program, &mut stdin.lock(), &mut stdout.lock()).map_err(|error| error.to_string())
+    execute(&program, &mut stdin.lock(), &mut stdout.lock())
+        .map_err(|error| format_runtime_error(error, error_style))
 }
 
-fn repl(language: Language) -> io::Result<()> {
+fn repl(language: Language, error_style: ErrorStyle) -> io::Result<()> {
     let stdin = io::stdin();
     let stdout = io::stdout();
     let mut input = stdin.lock();
@@ -251,7 +269,7 @@ fn repl(language: Language) -> io::Result<()> {
         match command {
             ":quit" | ":q" => break,
             "" => {}
-            _ => run_repl_source(command, language, &mut input, &mut output),
+            _ => run_repl_source(command, language, error_style, &mut input, &mut output),
         }
     }
 
@@ -261,10 +279,11 @@ fn repl(language: Language) -> io::Result<()> {
 fn run_repl_source<R: BufRead, W: Write>(
     source: &str,
     language: Language,
+    error_style: ErrorStyle,
     input: &mut R,
     output: &mut W,
 ) {
-    match compile(source, language) {
+    match compile(source, language, error_style) {
         Ok(program) => {
             let mut repl_output = ReplOutput::new(output);
             let result = execute(&program, input, &mut repl_output);
@@ -278,7 +297,7 @@ fn run_repl_source<R: BufRead, W: Write>(
             }
 
             if let Err(error) = result {
-                eprintln!("{error}");
+                eprintln!("{}", format_runtime_error(error, error_style));
             }
         }
         Err(error) => eprintln!("{error}"),
@@ -313,16 +332,39 @@ impl<W: Write> Write for ReplOutput<'_, W> {
     }
 }
 
-fn compile(source: &str, language: Language) -> Result<yahalang::parser::Program, String> {
+fn compile(
+    source: &str,
+    language: Language,
+    error_style: ErrorStyle,
+) -> Result<yahalang::parser::Program, String> {
     let tokens = lex(source, language).map_err(|error| {
         let (line, column) = location(source, error.span.start);
-        format!("{line}:{column}: {error}")
+        match error_style {
+            ErrorStyle::Usagi => format!("{line}:{column}: {error}"),
+            ErrorStyle::Friendly => format!(
+                "{line}:{column}: unexpected character {:?}",
+                error.character
+            ),
+        }
     })?;
 
     parse(&tokens).map_err(|error| {
         let (line, column) = location(source, error.span.start);
-        format!("{line}:{column}: {error}")
+        match error_style {
+            ErrorStyle::Usagi => format!("{line}:{column}: {error}"),
+            ErrorStyle::Friendly => format!("{line}:{column}: {}", error.message),
+        }
     })
+}
+
+fn format_runtime_error(error: yahalang::executor::RuntimeError, style: ErrorStyle) -> String {
+    match style {
+        ErrorStyle::Usagi => error.to_string(),
+        ErrorStyle::Friendly => format!(
+            "runtime error at line {}, instruction {}: {}",
+            error.line, error.instruction, error.message
+        ),
+    }
 }
 
 fn location(source: &str, byte_offset: usize) -> (usize, usize) {
