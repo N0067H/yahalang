@@ -111,11 +111,50 @@ fn run_repl_source<R: BufRead, W: Write>(
 ) {
     match compile(source, language) {
         Ok(program) => {
-            if let Err(error) = execute(&program, input, output) {
+            let mut repl_output = ReplOutput::new(output);
+            let result = execute(&program, input, &mut repl_output);
+
+            if repl_output
+                .last_byte
+                .is_some_and(|last_byte| last_byte != b'\n')
+            {
+                let _ = writeln!(repl_output);
+                let _ = repl_output.flush();
+            }
+
+            if let Err(error) = result {
                 eprintln!("{error}");
             }
         }
         Err(error) => eprintln!("{error}"),
+    }
+}
+
+struct ReplOutput<'a, W> {
+    output: &'a mut W,
+    last_byte: Option<u8>,
+}
+
+impl<'a, W> ReplOutput<'a, W> {
+    fn new(output: &'a mut W) -> Self {
+        Self {
+            output,
+            last_byte: None,
+        }
+    }
+}
+
+impl<W: Write> Write for ReplOutput<'_, W> {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        let written = self.output.write(buffer)?;
+        if written > 0 {
+            self.last_byte = Some(buffer[written - 1]);
+        }
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.output.flush()
     }
 }
 
