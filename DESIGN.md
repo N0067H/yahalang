@@ -50,7 +50,7 @@ romanizations, not an official English transcription.
 | Multiply | `후응` | `huung` | `フゥン` |
 | Divide | `후으응` | `hueung` | `フウン` |
 | Remainder | `쥬르리` | `jureuri` | `ジュルリ` |
-| Negate | `후웅` | `fuun` | `フゥン`* |
+| Negate | `후웅` | `fuun` | `フン`* |
 | Duplicate / discard | `푸루` / `푸루!` | `puru` / `puru!` | `プル` / `プル!` |
 | Conditional | `하아?` | `haa?` | `ハァ?` |
 | Jump / stop | `푸루야` / `푸루야!` | `puruya` / `puruya!` | `プルャ` / `プルャ!` |
@@ -58,9 +58,9 @@ romanizations, not an official English transcription.
 | Print an integer | `이` | `i` | `イ` |
 | Print a character | `우아` | `ua` | `ウア` |
 
-*The sound `フゥン` has been assigned to multiplication here; `fuun` is a
-separate project spelling for negation. The spellings are a design choice, not
-a strict phonetic transcription.
+*The Japanese negation spelling is chosen to keep it distinct from
+multiplication. These command spellings are design choices, not strict
+phonetic transcriptions.
 
 Use one language's spellings consistently in a program. Punctuation stays
 ASCII (`!` and `?`) in every spelling set.
