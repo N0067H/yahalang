@@ -1,5 +1,7 @@
 use crate::token::{Span, Token, TokenKind};
 
+const MAX_CONDITIONAL_DEPTH: usize = 128;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Program {
     pub lines: Vec<Vec<Instruction>>,
@@ -71,11 +73,16 @@ pub fn parse(tokens: &[Token]) -> Result<Program, ParseError> {
 struct Parser<'a> {
     tokens: &'a [Token],
     cursor: usize,
+    conditional_depth: usize,
 }
 
 impl<'a> Parser<'a> {
     fn new(tokens: &'a [Token]) -> Self {
-        Self { tokens, cursor: 0 }
+        Self {
+            tokens,
+            cursor: 0,
+            conditional_depth: 0,
+        }
     }
 
     fn parse_program(mut self) -> Result<Program, ParseError> {
@@ -232,9 +239,18 @@ impl<'a> Parser<'a> {
             });
         }
 
-        Ok(Instruction::Conditional(Box::new(
-            self.parse_instruction()?,
-        )))
+        if self.conditional_depth >= MAX_CONDITIONAL_DEPTH {
+            return Err(ParseError {
+                span: marker.span,
+                message: format!("조건 중첩은 최대 {MAX_CONDITIONAL_DEPTH}단계까지 가능해"),
+            });
+        }
+
+        self.conditional_depth += 1;
+        let body = self.parse_instruction();
+        self.conditional_depth -= 1;
+
+        body.map(|instruction| Instruction::Conditional(Box::new(instruction)))
     }
 
     fn consume(&mut self, instruction: Instruction) -> Result<Instruction, ParseError> {

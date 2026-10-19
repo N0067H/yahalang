@@ -100,6 +100,7 @@ value below it.
 `puru` copies the top value, and `puru!` removes it.
 `haa?` checks the top value and removes it.
 If the value was zero, `haa?` runs the next command on the same line.
+Conditions may be nested up to 128 levels. Deeper nesting is a parse error.
 
 `puruya` takes a line number from the stack and jumps there.
 `puruya!` ends the program.
