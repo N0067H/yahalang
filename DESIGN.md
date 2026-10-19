@@ -85,6 +85,18 @@ Commands that need values fail if the stack does not have enough.
 Invalid input, division by zero, arithmetic overflow, and invalid jump
 targets also stop the program with an error.
 
+## Running programs
+
+`yahalang run <file>` runs a source file. `yahalang repl` starts the
+interactive one-line REPL. Both commands accept `--lang en`, `--lang ko`, or
+`--lang ja`.
+
+Set a default language with `yahalang set lang ko`. The setting is saved in
+`config.toml` under the user's configuration directory, inside a `yahalang`
+folder. On Linux this is `$XDG_CONFIG_HOME/yahalang/config.toml`, or
+`~/.config/yahalang/config.toml` when `XDG_CONFIG_HOME` is unset. An explicit
+`--lang` option overrides the saved default; without either, English is used.
+
 ## Example: add two inputs
 
 This program reads two integers, adds them, and prints the sum:

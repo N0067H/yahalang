@@ -20,14 +20,20 @@ struct Cli {
 enum Command {
     #[command(about = "Start an interactive one-line REPL")]
     Repl {
-        #[arg(long, value_enum, default_value = "en")]
-        lang: CliLanguage,
+        #[arg(long, value_enum)]
+        lang: Option<CliLanguage>,
     },
     #[command(about = "Run a program from a source file")]
     Run {
         file: PathBuf,
-        #[arg(long, value_enum, default_value = "en")]
-        lang: CliLanguage,
+        #[arg(long, value_enum)]
+        lang: Option<CliLanguage>,
+    },
+    #[command(about = "Save a default setting")]
+    Set {
+        key: String,
+        #[arg(value_enum)]
+        language: CliLanguage,
     },
 }
 
@@ -36,6 +42,16 @@ enum CliLanguage {
     En,
     Ko,
     Ja,
+}
+
+impl CliLanguage {
+    fn code(self) -> &'static str {
+        match self {
+            Self::En => "en",
+            Self::Ko => "ko",
+            Self::Ja => "ja",
+        }
+    }
 }
 
 impl From<CliLanguage> for Language {
@@ -50,20 +66,159 @@ impl From<CliLanguage> for Language {
 
 fn main() -> ExitCode {
     match Cli::parse().command {
-        Command::Repl { lang } => match repl(lang.into()) {
+        Command::Repl { lang } => match selected_language(lang)
+            .map_err(io::Error::other)
+            .and_then(repl)
+        {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
                 eprintln!("yahalang: {error}");
                 ExitCode::FAILURE
             }
         },
-        Command::Run { file, lang } => match run_file(&file, lang.into()) {
-            Ok(()) => ExitCode::SUCCESS,
+        Command::Run { file, lang } => {
+            match selected_language(lang).and_then(|language| run_file(&file, language)) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(error) => {
+                    eprintln!("{}: {error}", file.display());
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        Command::Set { key, language } => match set_config(&key, language) {
+            Ok(path) => {
+                println!("saved {key} = {} to {}", language.code(), path.display());
+                ExitCode::SUCCESS
+            }
             Err(error) => {
-                eprintln!("{}: {error}", file.display());
+                eprintln!("yahalang: {error}");
                 ExitCode::FAILURE
             }
         },
+    }
+}
+
+fn selected_language(override_language: Option<CliLanguage>) -> Result<Language, String> {
+    let language = match override_language {
+        Some(language) => Some(language),
+        None => read_config_language()?,
+    }
+    .unwrap_or(CliLanguage::En);
+    Ok(language.into())
+}
+
+fn read_config_language() -> Result<Option<CliLanguage>, String> {
+    let path = config_file()?;
+    let contents = match fs::read_to_string(&path) {
+        Ok(contents) => contents,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("could not read {}: {error}", path.display())),
+    };
+
+    let mut language = None;
+    for (line_number, line) in contents.lines().enumerate() {
+        let line = line.split('#').next().unwrap_or_default().trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        let (key, value) = line
+            .split_once('=')
+            .ok_or_else(|| format!("invalid config at {}:{}", path.display(), line_number + 1))?;
+        if key.trim() != "lang" {
+            return Err(format!(
+                "unknown setting `{}` at {}:{}",
+                key.trim(),
+                path.display(),
+                line_number + 1
+            ));
+        }
+        if language.is_some() {
+            return Err(format!(
+                "duplicate `lang` setting at {}:{}",
+                path.display(),
+                line_number + 1
+            ));
+        }
+
+        let raw_value = value.trim();
+        let value = raw_value
+            .strip_prefix('"')
+            .and_then(|value| value.strip_suffix('"'))
+            .ok_or_else(|| {
+                format!(
+                    "expected a quoted language value at {}:{}",
+                    path.display(),
+                    line_number + 1
+                )
+            })?;
+        language = Some(parse_language(value).ok_or_else(|| {
+            format!(
+                "unsupported language `{value}` at {}:{}; expected en, ko, or ja",
+                path.display(),
+                line_number + 1
+            )
+        })?);
+    }
+
+    Ok(language)
+}
+
+fn set_config(key: &str, language: CliLanguage) -> Result<PathBuf, String> {
+    if key != "lang" {
+        return Err(format!("unknown setting `{key}`; available setting: lang"));
+    }
+
+    let path = config_file()?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| "config path has no parent directory".to_owned())?;
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("could not create {}: {error}", parent.display()))?;
+    fs::write(&path, format!("lang = \"{}\"\n", language.code()))
+        .map_err(|error| format!("could not write {}: {error}", path.display()))?;
+    Ok(path)
+}
+
+fn parse_language(value: &str) -> Option<CliLanguage> {
+    match value {
+        "en" => Some(CliLanguage::En),
+        "ko" => Some(CliLanguage::Ko),
+        "ja" => Some(CliLanguage::Ja),
+        _ => None,
+    }
+}
+
+fn config_file() -> Result<PathBuf, String> {
+    let config_root = if let Some(path) = std::env::var_os("YAHALANG_CONFIG_DIR") {
+        PathBuf::from(path)
+    } else {
+        default_config_dir()?
+    };
+    Ok(config_root.join("yahalang").join("config.toml"))
+}
+
+fn default_config_dir() -> Result<PathBuf, String> {
+    #[cfg(windows)]
+    {
+        return std::env::var_os("APPDATA")
+            .map(PathBuf::from)
+            .ok_or_else(|| "APPDATA is not set".to_owned());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        return std::env::var_os("HOME")
+            .map(|home| PathBuf::from(home).join("Library/Application Support"))
+            .ok_or_else(|| "HOME is not set".to_owned());
+    }
+
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        std::env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))
+            .ok_or_else(|| "XDG_CONFIG_HOME and HOME are not set".to_owned())
     }
 }
 
