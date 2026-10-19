@@ -132,53 +132,25 @@ fn read_config_language() -> Result<Option<CliLanguage>, String> {
         Err(error) => return Err(format!("could not read {}: {error}", path.display())),
     };
 
-    let mut language = None;
-    for (line_number, line) in contents.lines().enumerate() {
-        let line = line.split('#').next().unwrap_or_default().trim();
-        if line.is_empty() {
-            continue;
-        }
-
-        let (key, value) = line
-            .split_once('=')
-            .ok_or_else(|| format!("invalid config at {}:{}", path.display(), line_number + 1))?;
-        if key.trim() != "lang" {
-            return Err(format!(
-                "unknown setting `{}` at {}:{}",
-                key.trim(),
-                path.display(),
-                line_number + 1
-            ));
-        }
-        if language.is_some() {
-            return Err(format!(
-                "duplicate `lang` setting at {}:{}",
-                path.display(),
-                line_number + 1
-            ));
-        }
-
-        let raw_value = value.trim();
-        let value = raw_value
-            .strip_prefix('"')
-            .and_then(|value| value.strip_suffix('"'))
-            .ok_or_else(|| {
-                format!(
-                    "expected a quoted language value at {}:{}",
-                    path.display(),
-                    line_number + 1
-                )
-            })?;
-        language = Some(parse_language(value).ok_or_else(|| {
-            format!(
-                "unsupported language `{value}` at {}:{}; expected en, ko, or ja",
-                path.display(),
-                line_number + 1
-            )
-        })?);
+    let config = contents
+        .parse::<toml::Table>()
+        .map_err(|error| format!("invalid config at {}: {error}", path.display()))?;
+    if let Some(key) = config.keys().find(|key| key.as_str() != "lang") {
+        return Err(format!("unknown setting `{key}` at {}", path.display()));
     }
 
-    Ok(language)
+    let Some(value) = config.get("lang") else {
+        return Ok(None);
+    };
+    let value = value
+        .as_str()
+        .ok_or_else(|| format!("expected a language string at {}", path.display()))?;
+    parse_language(value).map(Some).ok_or_else(|| {
+        format!(
+            "unsupported language `{value}` at {}; expected en, ko, or ja",
+            path.display()
+        )
+    })
 }
 
 fn set_config(key: &str, language: CliLanguage) -> Result<PathBuf, String> {
