@@ -64,3 +64,18 @@ fn repl_runs_each_entered_line_and_separates_its_output_from_the_prompt() {
     assert_eq!(String::from_utf8(output.stdout).unwrap(), "yaha> 2\nyaha> ");
     assert!(output.stderr.is_empty());
 }
+
+#[test]
+fn errors_keep_source_locations_and_use_the_playful_voice() {
+    let source = temp_source(".");
+    let output = Command::new(env!("CARGO_BIN_EXE_yahalang"))
+        .arg("run")
+        .arg(&source)
+        .output()
+        .expect("start yahalang with invalid source");
+    fs::remove_file(source).expect("remove temporary source file");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("1:1: haa?"), "{stderr}");
+}

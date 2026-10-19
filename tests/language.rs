@@ -123,7 +123,9 @@ fn empty_program_and_blank_lines_succeed() {
 
 #[test]
 fn runtime_errors_cover_underflow_overflow_zero_divisors_and_bad_jumps() {
-    assert!(run("yaha", "").0.unwrap_err().message.contains("underflow"));
+    let underflow = run("yaha", "").0.unwrap_err();
+    assert!(underflow.message.contains("underflow"));
+    assert_eq!(underflow.to_string(), "haa? haa?");
     assert!(
         run("ui ui yaha", "9223372036854775807\n1\n")
             .0

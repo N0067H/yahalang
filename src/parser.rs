@@ -32,7 +32,7 @@ pub struct ParseError {
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.message)
+        f.write_str("haa?")
     }
 }
 
@@ -47,7 +47,7 @@ pub fn parse(tokens: &[Token]) -> Result<Program, ParseError> {
             span: tokens
                 .last()
                 .map_or(Span { start: 0, end: 0 }, |token| token.span),
-            message: "token stream is missing EOF".to_owned(),
+            message: "토큰 끝이 없어".to_owned(),
         });
     };
 
@@ -57,7 +57,7 @@ pub fn parse(tokens: &[Token]) -> Result<Program, ParseError> {
     {
         return Err(ParseError {
             span: token.span,
-            message: "unexpected EOF inside token stream".to_owned(),
+            message: "토큰 중간에 끝이 나왔어".to_owned(),
         });
     }
 
@@ -165,7 +165,7 @@ impl<'a> Parser<'a> {
             self.advance();
             count = count.checked_add(1).ok_or_else(|| ParseError {
                 span: token.span,
-                message: "numeric repetition exceeds i64::MAX".to_owned(),
+                message: "숫자 반복이 너무 길어".to_owned(),
             })?;
             previous = Some(token.span);
         }
@@ -178,7 +178,7 @@ impl<'a> Parser<'a> {
         if !self.take_adjacent(TokenKind::Question, marker.span) {
             return Err(ParseError {
                 span: marker.span,
-                message: "expected `?` immediately after the conditional utterance".to_owned(),
+                message: "조건 표현 뒤에 바로 `?`가 와야 해".to_owned(),
             });
         }
 
@@ -186,7 +186,7 @@ impl<'a> Parser<'a> {
         if self.at(TokenKind::Newline) || self.at(TokenKind::Eof) {
             return Err(ParseError {
                 span: marker.span,
-                message: "conditional is missing its instruction".to_owned(),
+                message: "조건 뒤에 실행할 명령이 없어".to_owned(),
             });
         }
 
@@ -231,7 +231,10 @@ impl<'a> Parser<'a> {
     fn unexpected(&self, expected: &str) -> ParseError {
         ParseError {
             span: self.current().span,
-            message: format!("expected {expected}, found {:?}", self.current().kind),
+            message: format!(
+                "{expected}이 와야 하는데 {:?} 토큰이 나왔어",
+                self.current().kind
+            ),
         }
     }
 
