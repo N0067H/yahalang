@@ -1,11 +1,15 @@
+use std::cell::RefCell;
 use std::io::{BufRead, Write};
+use std::rc::Rc;
 
 use crate::parser::{Instruction, Program};
+
+type Array = Rc<RefCell<Vec<i64>>>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Value {
     Integer(i64),
-    Array(usize),
+    Array(Array),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -51,7 +55,6 @@ pub fn execute<R: BufRead, W: Write>(
     output: &mut W,
 ) -> Result<(), RuntimeError> {
     let mut stack = Vec::new();
-    let mut arrays = Vec::new();
     let mut line_index = 0;
 
     while line_index < program.lines.len() {
@@ -62,7 +65,6 @@ pub fn execute<R: BufRead, W: Write>(
             let flow = execute_instruction(
                 instruction,
                 &mut stack,
-                &mut arrays,
                 input,
                 output,
                 program.lines.len(),
@@ -92,7 +94,6 @@ pub fn execute<R: BufRead, W: Write>(
 fn execute_instruction<R: BufRead, W: Write>(
     instruction: &Instruction,
     stack: &mut Vec<Value>,
-    arrays: &mut Vec<Vec<i64>>,
     input: &mut R,
     output: &mut W,
     line_count: usize,
@@ -141,7 +142,6 @@ fn execute_instruction<R: BufRead, W: Write>(
                 return execute_instruction(
                     body,
                     stack,
-                    arrays,
                     input,
                     output,
                     line_count,
@@ -180,18 +180,16 @@ fn execute_instruction<R: BufRead, W: Write>(
                 .map_err(|err| error(format!("output flush failed: {err}")))?;
         }
         Instruction::ArrayLiteral(values) => {
-            let array_id = arrays.len();
-            arrays.push(values.clone());
-            stack.push(Value::Array(array_id));
+            stack.push(Value::Array(Rc::new(RefCell::new(values.clone()))));
         }
         Instruction::ArrayGet => {
             let index = pop_integer(stack).map_err(error)?;
-            let array_id = pop_array(stack).map_err(error)?;
+            let array = pop_array(stack).map_err(error)?;
             let index = usize::try_from(index)
                 .map_err(|_| error(format!("array index {index} is out of bounds")))?;
-            let value = arrays
-                .get(array_id)
-                .and_then(|array| array.get(index))
+            let value = array
+                .borrow()
+                .get(index)
                 .copied()
                 .ok_or_else(|| error(format!("array index {index} is out of bounds")))?;
             stack.push(Value::Integer(value));
@@ -199,21 +197,18 @@ fn execute_instruction<R: BufRead, W: Write>(
         Instruction::ArraySet => {
             let value = pop_integer(stack).map_err(error)?;
             let index = pop_integer(stack).map_err(error)?;
-            let array_id = pop_array(stack).map_err(error)?;
+            let array = pop_array(stack).map_err(error)?;
             let index = usize::try_from(index)
                 .map_err(|_| error(format!("array index {index} is out of bounds")))?;
-            let element = arrays
-                .get_mut(array_id)
-                .and_then(|array| array.get_mut(index))
+            let mut values = array.borrow_mut();
+            let element = values
+                .get_mut(index)
                 .ok_or_else(|| error(format!("array index {index} is out of bounds")))?;
             *element = value;
         }
         Instruction::ArrayLength => {
-            let array_id = pop_array(stack).map_err(error)?;
-            let length = arrays
-                .get(array_id)
-                .ok_or_else(|| error("invalid array reference".to_owned()))?
-                .len();
+            let array = pop_array(stack).map_err(error)?;
+            let length = array.borrow().len();
             stack.push(Value::Integer(length as i64));
         }
     }
@@ -228,9 +223,9 @@ fn pop_integer(stack: &mut Vec<Value>) -> Result<i64, String> {
     }
 }
 
-fn pop_array(stack: &mut Vec<Value>) -> Result<usize, String> {
+fn pop_array(stack: &mut Vec<Value>) -> Result<Array, String> {
     match stack.pop().ok_or_else(|| "stack underflow".to_owned())? {
-        Value::Array(id) => Ok(id),
+        Value::Array(array) => Ok(array),
         Value::Integer(_) => Err("expected an array but found an integer".to_owned()),
     }
 }
