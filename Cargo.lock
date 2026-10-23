@@ -276,7 +276,7 @@ checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 
 [[package]]
 name = "yahalang"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "clap",
  "toml",
