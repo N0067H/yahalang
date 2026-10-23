@@ -1,60 +1,65 @@
 use crate::language::Language;
 
-macro_rules! define_token_kinds {
-    (
-        $($kind:ident => [$english:literal, $korean:literal, $japanese:literal]),+ $(,)?
-    ) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        pub enum TokenKind {
-            $($kind,)+
-            Semicolon,
-            LeftBracket,
-            RightBracket,
-            Comma,
-            At,
-            Equal,
-            Hash,
-            HorizontalWhitespace,
-            Newline,
-            Eof,
-        }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TokenKind {
+    Hayaha,
+    Ura,
+    Yaha,
+    Ppuru,
+    Ppururu,
+    Iiiiyaha,
+    Urara,
+    Iya,
+    Yada,
+    Hat,
+    Yat,
 
-        impl TokenKind {
-            pub const fn spelling(self, language: Language) -> Option<&'static str> {
-                match self {
-                    $(
-                        Self::$kind => Some(match language {
-                            Language::English => $english,
-                            Language::Korean => $korean,
-                            Language::Japanese => $japanese,
-                        }),
-                    )+
-                    Self::Semicolon => Some(";"),
-                    Self::LeftBracket => Some("["),
-                    Self::RightBracket => Some("]"),
-                    Self::Comma => Some(","),
-                    Self::At => Some("@"),
-                    Self::Equal => Some("="),
-                    Self::Hash => Some("#"),
-                    Self::HorizontalWhitespace | Self::Newline | Self::Eof => None,
-                }
-            }
-        }
-    };
+    Semicolon,
+    LeftBracket,
+    RightBracket,
+    Comma,
+    At,
+    Equal,
+    Hash,
+
+    HorizontalWhitespace,
+    Newline,
+    Eof,
 }
 
-define_token_kinds! {
-    Hayaha => ["hayaha", "하야하", "ハヤハ"],
-    Ura => ["ura", "우라", "ウラ"],
-    Yaha => ["yaha", "야하", "ヤハ"],
-    Ppuru => ["ppuru", "뿌루", "プル"],
-    Ppururu => ["ppururu", "뿌루루", "プルル"],
-    Iiiiyaha => ["iiiiyaha", "이이이야하", "イイイヤハ"],
-    Urara => ["urara", "우라라", "ウララ"],
-    Iya => ["iya", "이야", "イヤ"],
-    Yada => ["yada", "야다", "ヤダ"],
-    Hat => ["hat", "핫", "ハッ"],
-    Yat => ["yat", "얏", "ヤッ"],
+impl TokenKind {
+    pub const fn spelling(self, language: Language) -> Option<&'static str> {
+        let spellings = match self {
+            Self::Hayaha => ["hayaha", "하야하", "ハヤハ"],
+            Self::Ura => ["ura", "우라", "ウラ"],
+            Self::Yaha => ["yaha", "야하", "ヤハ"],
+            Self::Ppuru => ["ppuru", "뿌루", "プル"],
+            Self::Ppururu => ["ppururu", "뿌루루", "プルル"],
+            Self::Iiiiyaha => ["iiiiyaha", "이이이야하", "イイイヤハ"],
+            Self::Urara => ["urara", "우라라", "ウララ"],
+            Self::Iya => ["iya", "이야", "イヤ"],
+            Self::Yada => ["yada", "야다", "ヤダ"],
+            Self::Hat => ["hat", "핫", "ハッ"],
+            Self::Yat => ["yat", "얏", "ヤッ"],
+
+            Self::Semicolon => return Some(";"),
+            Self::LeftBracket => return Some("["),
+            Self::RightBracket => return Some("]"),
+            Self::Comma => return Some(","),
+            Self::At => return Some("@"),
+            Self::Equal => return Some("="),
+            Self::Hash => return Some("#"),
+            Self::HorizontalWhitespace | Self::Newline | Self::Eof => return None,
+        };
+
+        let index = match language {
+            Language::English => 0,
+            Language::Korean => 1,
+            Language::Japanese => 2,
+        };
+
+        Some(spellings[index])
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

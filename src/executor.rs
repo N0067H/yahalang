@@ -21,12 +21,10 @@ pub struct RuntimeError {
 
 impl std::fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let reaction =
-            if self.message.contains("integer input") || self.message.starts_with("input") {
-                "ui"
-            } else {
-                "haa? haa?"
-            };
+        let is_input_error =
+            self.message.contains("integer input") || self.message.starts_with("input");
+        let reaction = if is_input_error { "ui" } else { "haa? haa?" };
+
         f.write_str(reaction)
     }
 }
@@ -65,24 +63,28 @@ pub fn execute<R: BufRead, W: Write>(
                 .map(move |(index, instruction)| (line + 1, index + 1, instruction))
         })
         .collect();
+
     let mut pc = 0;
+
     while let Some(&(line, index, instruction)) = instructions.get(pc) {
-        match execute_instruction(instruction, &mut stack, input, output, line, index)? {
-            Flow::Continue => pc += 1,
-            Flow::Jump(target) => {
-                if target > instructions.len() {
-                    return Err(RuntimeError {
-                        line,
-                        instruction: index,
-                        message: "invalid instruction target".to_owned(),
-                    });
-                }
-                pc = target;
-            }
-            Flow::Halt => return Ok(()),
-        }
+        let flow = execute_instruction(instruction, &mut stack, input, output, line, index)?;
+        pc = next_instruction(flow, pc, instructions.len()).map_err(|message| RuntimeError {
+            line,
+            instruction: index,
+            message,
+        })?;
     }
+
     Ok(())
+}
+
+fn next_instruction(flow: Flow, current: usize, length: usize) -> Result<usize, String> {
+    match flow {
+        Flow::Continue => Ok(current + 1),
+        Flow::Halt => Ok(length),
+        Flow::Jump(target) if target <= length => Ok(target),
+        Flow::Jump(_) => Err("invalid instruction target".to_owned()),
+    }
 }
 
 fn execute_instruction<R: BufRead, W: Write>(
@@ -106,6 +108,7 @@ fn execute_instruction<R: BufRead, W: Write>(
         Instruction::Multiply => binary(stack, BinaryOperation::Multiply).map_err(error)?,
         Instruction::Divide => binary(stack, BinaryOperation::Divide).map_err(error)?,
         Instruction::Remainder => binary(stack, BinaryOperation::Remainder).map_err(error)?,
+
         Instruction::Negate => {
             let value = stack
                 .last()
@@ -115,13 +118,16 @@ fn execute_instruction<R: BufRead, W: Write>(
             let result = value
                 .checked_neg()
                 .ok_or_else(|| error("arithmetic overflow".to_owned()))?;
+
             *stack.last_mut().expect("top value was checked") = Value::Integer(result);
         }
+
         Instruction::Duplicate => {
             let value = stack
                 .last()
                 .ok_or_else(|| error("stack underflow".to_owned()))?
                 .clone();
+
             stack.push(value);
         }
         Instruction::Discard => {
@@ -129,22 +135,17 @@ fn execute_instruction<R: BufRead, W: Write>(
                 .pop()
                 .ok_or_else(|| error("stack underflow".to_owned()))?;
         }
+
         Instruction::WhileStart(target) => {
-            let condition = stack
-                .last()
-                .ok_or_else(|| error("stack underflow".to_owned()))?
-                .as_integer()
-                .map_err(error)?;
-            if condition == 0 {
-                return Ok(Flow::Jump(*target));
-            }
+            let condition = peek_integer(stack).map_err(error)?;
+            return Ok(conditional_flow(condition, *target));
         }
         Instruction::WhileEnd(target) => return Ok(Flow::Jump(*target)),
         Instruction::IfStart(target) => {
-            if pop_integer(stack).map_err(error)? == 0 {
-                return Ok(Flow::Jump(*target));
-            }
+            let condition = pop_integer(stack).map_err(error)?;
+            return Ok(conditional_flow(condition, *target));
         }
+
         Instruction::Halt => return Ok(Flow::Halt),
         Instruction::ReadInteger => stack.push(Value::Integer(read_integer(input).map_err(error)?)),
         Instruction::PrintInteger => {
@@ -165,6 +166,7 @@ fn execute_instruction<R: BufRead, W: Write>(
                 .flush()
                 .map_err(|err| error(format!("output flush failed: {err}")))?;
         }
+
         Instruction::ArrayLiteral(values) => {
             stack.push(Value::Array(Rc::new(RefCell::new(values.clone()))));
         }
@@ -178,6 +180,7 @@ fn execute_instruction<R: BufRead, W: Write>(
                 .get(index)
                 .copied()
                 .ok_or_else(|| error(format!("array index {index} is out of bounds")))?;
+
             stack.push(Value::Integer(value));
         }
         Instruction::ArraySet => {
@@ -190,6 +193,7 @@ fn execute_instruction<R: BufRead, W: Write>(
             let element = values
                 .get_mut(index)
                 .ok_or_else(|| error(format!("array index {index} is out of bounds")))?;
+
             *element = value;
         }
         Instruction::ArrayLength => {
@@ -200,6 +204,20 @@ fn execute_instruction<R: BufRead, W: Write>(
     }
 
     Ok(Flow::Continue)
+}
+
+fn conditional_flow(condition: i64, target: usize) -> Flow {
+    match condition {
+        0 => Flow::Jump(target),
+        _ => Flow::Continue,
+    }
+}
+
+fn peek_integer(stack: &[Value]) -> Result<i64, String> {
+    stack
+        .last()
+        .ok_or_else(|| "stack underflow".to_owned())?
+        .as_integer()
 }
 
 fn pop_integer(stack: &mut Vec<Value>) -> Result<i64, String> {
@@ -256,8 +274,10 @@ fn binary(stack: &mut Vec<Value>, operation: BinaryOperation) -> Result<(), Stri
         BinaryOperation::Remainder => left.checked_rem(right),
     }
     .ok_or_else(|| "arithmetic overflow".to_owned())?;
+
     stack.truncate(stack.len() - 2);
     stack.push(Value::Integer(result));
+
     Ok(())
 }
 

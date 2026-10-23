@@ -66,65 +66,22 @@ impl<'a> Lexer<'a> {
         let rest = &self.source[start..];
         let first = rest.chars().next().expect("offset is before end");
 
-        let kind = match first {
-            ' ' | '\t' => {
-                self.offset += rest
-                    .bytes()
-                    .take_while(|byte| matches!(byte, b' ' | b'\t'))
-                    .count();
-                TokenKind::HorizontalWhitespace
-            }
-            '\n' => {
-                self.offset += 1;
-                TokenKind::Newline
-            }
-            '\r' if rest.starts_with("\r\n") => {
-                self.offset += 2;
-                TokenKind::Newline
-            }
-            ';' => {
-                self.offset += 1;
-                TokenKind::Semicolon
-            }
-            '[' => {
-                self.offset += 1;
-                TokenKind::LeftBracket
-            }
-            ']' => {
-                self.offset += 1;
-                TokenKind::RightBracket
-            }
-            ',' => {
-                self.offset += 1;
-                TokenKind::Comma
-            }
-            '@' => {
-                self.offset += 1;
-                TokenKind::At
-            }
-            '=' => {
-                self.offset += 1;
-                TokenKind::Equal
-            }
-            '#' => {
-                self.offset += 1;
-                TokenKind::Hash
-            }
-            _ => {
-                if let Some((kind, spelling)) = Self::matching_utterance(rest, self.language) {
-                    self.offset += spelling.len();
-                    kind
-                } else {
-                    return Err(LexError {
-                        span: Span {
-                            start,
-                            end: start + first.len_utf8(),
-                        },
-                        character: first,
-                    });
-                }
-            }
+        let (kind, length) = match first {
+            ' ' | '\t' => (TokenKind::HorizontalWhitespace, horizontal_length(rest)),
+            '\n' => (TokenKind::Newline, 1),
+            '\r' if rest.starts_with("\r\n") => (TokenKind::Newline, 2),
+
+            ';' => (TokenKind::Semicolon, 1),
+            '[' => (TokenKind::LeftBracket, 1),
+            ']' => (TokenKind::RightBracket, 1),
+            ',' => (TokenKind::Comma, 1),
+            '@' => (TokenKind::At, 1),
+            '=' => (TokenKind::Equal, 1),
+            '#' => (TokenKind::Hash, 1),
+
+            _ => self.utterance(rest, first)?,
         };
+        self.offset += length;
 
         Ok(Token {
             kind,
@@ -132,6 +89,20 @@ impl<'a> Lexer<'a> {
                 start,
                 end: self.offset,
             },
+        })
+    }
+
+    fn utterance(&self, rest: &str, first: char) -> Result<(TokenKind, usize), LexError> {
+        if let Some((kind, spelling)) = Self::matching_utterance(rest, self.language) {
+            return Ok((kind, spelling.len()));
+        }
+
+        Err(LexError {
+            span: Span {
+                start: self.offset,
+                end: self.offset + first.len_utf8(),
+            },
+            character: first,
         })
     }
 
@@ -146,4 +117,11 @@ impl<'a> Lexer<'a> {
 
 pub fn lex(source: &str, language: Language) -> Result<Vec<Token>, LexError> {
     Lexer::new(source, language).tokenize()
+}
+
+fn horizontal_length(source: &str) -> usize {
+    source
+        .bytes()
+        .take_while(|byte| matches!(byte, b' ' | b'\t'))
+        .count()
 }

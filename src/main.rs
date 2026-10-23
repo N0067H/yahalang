@@ -76,43 +76,38 @@ impl From<CliLanguage> for Language {
 }
 
 fn main() -> ExitCode {
-    match Cli::parse().command {
-        Command::Repl { lang, error_style } => match selected_language(lang)
-            .map_err(io::Error::other)
-            .and_then(|language| repl(language, error_style))
-        {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(error) => {
-                eprintln!("yahalang: {error}");
-                ExitCode::FAILURE
-            }
-        },
+    match dispatch(Cli::parse().command) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn dispatch(command: Command) -> Result<(), String> {
+    match command {
+        Command::Repl { lang, error_style } => selected_language(lang)
+            .and_then(|language| repl(language, error_style).map_err(|error| error.to_string()))
+            .map_err(|error| format!("yahalang: {error}")),
         Command::Run {
             file,
             lang,
             error_style,
-        } => {
-            match selected_language(lang)
-                .and_then(|language| run_file(&file, language, error_style))
-            {
-                Ok(()) => ExitCode::SUCCESS,
-                Err(error) => {
-                    eprintln!("{}: {error}", file.display());
-                    ExitCode::FAILURE
-                }
-            }
+        } => selected_language(lang)
+            .and_then(|language| run_file(&file, language, error_style))
+            .map_err(|error| format!("{}: {error}", file.display())),
+        Command::Set { key, language } => {
+            save_setting(&key, language).map_err(|error| format!("yahalang: {error}"))
         }
-        Command::Set { key, language } => match set_config(&key, language) {
-            Ok(path) => {
-                println!("saved {key} = {} to {}", language.code(), path.display());
-                ExitCode::SUCCESS
-            }
-            Err(error) => {
-                eprintln!("yahalang: {error}");
-                ExitCode::FAILURE
-            }
-        },
     }
+}
+
+fn save_setting(key: &str, language: CliLanguage) -> Result<(), String> {
+    let path = set_config(key, language)?;
+    println!("saved {key} = {} to {}", language.code(), path.display());
+
+    Ok(())
 }
 
 fn selected_language(override_language: Option<CliLanguage>) -> Result<Language, String> {
@@ -121,6 +116,7 @@ fn selected_language(override_language: Option<CliLanguage>) -> Result<Language,
         None => read_config_language()?,
     }
     .unwrap_or(CliLanguage::En);
+
     Ok(language.into())
 }
 
@@ -142,9 +138,11 @@ fn read_config_language() -> Result<Option<CliLanguage>, String> {
     let Some(value) = config.get("lang") else {
         return Ok(None);
     };
+
     let value = value
         .as_str()
         .ok_or_else(|| format!("expected a language string at {}", path.display()))?;
+
     parse_language(value).map(Some).ok_or_else(|| {
         format!(
             "unsupported language `{value}` at {}; expected en, ko, or ja",
@@ -166,6 +164,7 @@ fn set_config(key: &str, language: CliLanguage) -> Result<PathBuf, String> {
         .map_err(|error| format!("could not create {}: {error}", parent.display()))?;
     fs::write(&path, format!("lang = \"{}\"\n", language.code()))
         .map_err(|error| format!("could not write {}: {error}", path.display()))?;
+
     Ok(path)
 }
 
@@ -184,6 +183,7 @@ fn config_file() -> Result<PathBuf, String> {
     } else {
         default_config_dir()?
     };
+
     Ok(config_root.join("yahalang").join("config.toml"))
 }
 
@@ -255,24 +255,27 @@ fn run_repl_source<R: BufRead, W: Write>(
     input: &mut R,
     output: &mut W,
 ) {
-    match compile(source, language, error_style) {
-        Ok(program) => {
-            let mut repl_output = ReplOutput::new(output);
-            let result = execute(&program, input, &mut repl_output);
-
-            if repl_output
-                .last_byte
-                .is_some_and(|last_byte| last_byte != b'\n')
-            {
-                let _ = writeln!(repl_output);
-                let _ = repl_output.flush();
-            }
-
-            if let Err(error) = result {
-                eprintln!("{}", format_runtime_error(error, error_style));
-            }
+    let program = match compile(source, language, error_style) {
+        Ok(program) => program,
+        Err(error) => {
+            eprintln!("{error}");
+            return;
         }
-        Err(error) => eprintln!("{error}"),
+    };
+
+    let mut repl_output = ReplOutput::new(output);
+    let result = execute(&program, input, &mut repl_output);
+
+    if repl_output
+        .last_byte
+        .is_some_and(|last_byte| last_byte != b'\n')
+    {
+        let _ = writeln!(repl_output);
+        let _ = repl_output.flush();
+    }
+
+    if let Err(error) = result {
+        eprintln!("{}", format_runtime_error(error, error_style));
     }
 }
 
@@ -296,6 +299,7 @@ impl<W: Write> Write for ReplOutput<'_, W> {
         if written > 0 {
             self.last_byte = Some(buffer[written - 1]);
         }
+
         Ok(written)
     }
 
