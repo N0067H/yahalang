@@ -1,230 +1,192 @@
 <h1 align="center">Yahalang</h1>
 
-<p align="center">
-  <img src="image.png" alt="치이카와의 우사기" width="280">
-</p>
+<p align="center"><img src="image.png" alt="치이카와의 우사기" width="280"></p>
+<p align="center"><a href="README_EN.md">English</a> · 한국어 · <a href="README_JP.md">日本語</a></p>
 
-<p align="center">
-  <a href="README_EN.md">English</a> ·
-  <a href="README.md">한국어</a> ·
-  <a href="README_JP.md">日本語</a>
-</p>
+Yahalang은 *치이카와* 우사기의 말소리와 우사기랩의 후렴에서 착안한 스택 기반 난해한 프로그래밍 언어입니다.
+한국어·영어·일본어 표기, 부호 있는 64비트 정수, 수정 가능한 정수 배열을 지원합니다.
 
-Yahalang은 *치이카와*의 우사기 말소리에서 착안한 스택 기반 난해한 프로그래밍 언어입니다.
-영어, 한국어, 일본어 명령 표기와 부호 있는 64비트 정수, 수정 가능한 정수 배열을 지원합니다.
+**문법이 변경되었습니다.** 이전의 `ura yaha` 숫자, `ui` 입력, 줄 번호 점프 등은 지원하지 않습니다.
+기존 프로그램은 새 문법으로 변환해야 합니다. 자세한 명세는 [DESIGN.md](DESIGN.md)에 있습니다.
 
 ## 빌드 및 실행
 
-Rust와 Cargo를 설치한 뒤 저장소 루트에서 실행합니다.
-
 ```sh
 cargo build
-cargo run -- run examples/hello_world.yaha --lang en
+cargo run -- run examples/hello_world.yaha --lang ko
+cargo run -- run examples/countdown.yaha --lang ko
 ```
 
-출력:
-
-```text
-Hello, world!
-```
-
-REPL을 시작하려면 다음 명령을 실행합니다.
+각각 `Hello, world!`와 줄바꿈, `321`을 출력합니다. 저장소 예제는 한국어 표기입니다.
 
 ```sh
-cargo run -- repl --lang en
+cargo run -- repl --lang ko
 ```
 
 ```text
-yaha> ura yahayaha i
+yaha> 하야하 뿌루뿌루 야하 이이이야하 뿌루루
 2
 yaha> :q
 ```
 
-REPL의 각 입력은 독립된 프로그램으로 실행됩니다.
-스택과 배열은 다음 입력으로 이어지지 않습니다.
-종료 명령은 `:q` 또는 `:quit`입니다.
+REPL은 한 줄 전체를 독립된 프로그램으로 실행합니다. 블록도 같은 입력 줄 안에서 닫아야 합니다.
+스택과 배열은 다음 입력으로 이어지지 않으며 `:q` 또는 `:quit`으로 종료합니다.
+파일 실행에서는 줄 사이에 상태가 유지됩니다.
 
-파일은 전체가 하나의 프로그램으로 실행되며, 줄 사이에 상태가 유지됩니다.
+## 숫자
 
-아래 예제는 영어 표기를 사용합니다.
-명시적으로 지정한 `--lang en`이 저장된 기본 언어보다 우선합니다.
-
-## 숫자와 스택
-
-`ura`는 0에서 숫자를 시작합니다.
-이어 붙인 `yaha` 하나마다 값이 1씩 증가합니다.
+`하야하`로 시작하고 `야하`로 닫습니다. 사이에 있는 `뿌루` 개수가 값입니다.
 
 | 코드 | 값 |
 | --- | --- |
-| `ura` | 0 |
-| `ura yaha` | 1 |
-| `ura yahayaha` | 2 |
-| `ura yahayahayaha` | 3 |
+| `하야하 야하` | 0 |
+| `하야하 뿌루 야하` | 1 |
+| `하야하 뿌루뿌루 야하` | 2 |
 
-한 숫자를 표현하는 `yaha`들은 서로 붙여 써야 합니다.
-공백은 세기를 끝내므로 `ura yaha yaha`는 2가 아니라 1을 넣은 뒤 덧셈을 실행합니다.
-
-다음 코드는 1과 2를 스택에 넣고 더한 뒤 `3`을 출력합니다.
+숫자 안의 공백·줄바꿈은 값에 영향을 주지 않습니다. 음수는 숫자 뒤에 `우라 얏`을 붙입니다.
+다음 코드는 2와 3을 더해 `5`를 출력합니다.
 
 ```text
-ura yaha ura yahayaha yaha i
+하야하 뿌루뿌루 야하
+하야하 뿌루뿌루뿌루 야하
+야하
+이이이야하 뿌루루
+얏
 ```
 
-이항 연산은 맨 위 두 값을 꺼내고 결과를 넣습니다.
-뺄셈, 나눗셈, 나머지 연산에서 아래 값이 왼쪽 피연산자입니다.
+## 명령과 구절
 
-오버플로, 0으로 나누기, 스택 값 부족은 실행 오류입니다.
-
-## 명령
-
-| 영어 | 한국어 | 일본어 | 동작 |
+| 한국어 | 영어 | 일본어 | 동작 |
 | --- | --- | --- | --- |
-| `ura` | `우라` | `ウラ` | 정수 리터럴 시작 |
-| `yaha` / `yaha!` | `야하` / `야하!` | `ヤハ` / `ヤハ!` | 덧셈 / 뺄셈 |
-| `huung` | `후응` | `フゥン` | 곱셈 |
-| `hueung` | `후으응` | `フウン` | 정수 나눗셈 |
-| `jureuri` | `쥬르리` | `ジュルリ` | 나머지 |
-| `fuun` | `후웅` | `フン` | 부호 반전 |
-| `puru` / `puru!` | `푸루` / `푸루!` | `プル` / `プル!` | 맨 위 값 복제 / 버리기 |
-| `haa?` | `하아?` | `ハァ?` | 꺼낸 값이 0이면 다음 명령 실행 |
-| `puruya` / `puruya!` | `푸루야` / `푸루야!` | `プルャ` / `プルャ!` | 줄 번호로 점프 / 종료 |
-| `ui` | `우이` | `ウイ` | 정수 입력 |
-| `i` | `이` | `イ` | 정수 출력 |
-| `ua` | `우아` | `ウア` | 코드 포인트로 유니코드 문자 하나 출력 |
+| `하야하 … 야하` | `hayaha … yaha` | `ハヤハ … ヤハ` | `뿌루` 개수로 정수 생성 |
+| `야하` | `yaha` | `ヤハ` | 덧셈 |
+| `우라 야하` | `ura yaha` | `ウラ ヤハ` | 뺄셈 |
+| `핫` | `hat` | `ハッ` | 곱셈 |
+| `우라 핫` | `ura hat` | `ウラ ハッ` | 정수 나눗셈 |
+| `우라 핫핫` | `ura hathat` | `ウラ ハッハッ` | 나머지 |
+| `우라 얏` | `ura yat` | `ウラ ヤッ` | 부호 반전 |
+| `뿌루` / `우라 뿌루` | `ppuru` / `ura ppuru` | `プル` / `ウラ プル` | 복제 / 버리기 |
+| `이이이야하` | `iiiiyaha` | `イイイヤハ` | 정수 입력 |
+| `이이이야하 뿌루루` | `iiiiyaha ppururu` | `イイイヤハ プルル` | 정수 출력 |
+| `이이이야하 우라라` | `iiiiyaha urara` | `イイイヤハ ウララ` | 유니코드 문자 출력 |
+| `얏` | `yat` | `ヤッ` | 프로그램 종료 |
 
-`haa?`는 조건 값을 꺼내고 같은 줄의 다음 명령 하나를 조건부로 실행합니다.
-조건 중첩은 최대 128단계입니다.
+이항 연산은 스택 아래 값이 왼쪽 피연산자입니다. 나눗셈은 0 방향으로 버립니다.
+입력은 한 줄에 정수 하나입니다. 출력은 값을 꺼내며 자동 줄바꿈을 붙이지 않습니다.
 
-점프 대상 줄 번호는 1부터 시작하며 빈 줄도 셉니다.
+대시 없이 `이야`, `우라`로 씁니다. 대시와 알 수 없는 소리는 오류입니다.
+붙여 쓴 `야하야하`, `뿌루뿌루`, `핫핫핫`도 토큰으로 분리하며 가장 긴 소리를 우선합니다.
+`뿌루루`는 `뿌루`와 별개입니다. 공백과 줄바꿈은 구절 결합을 끊지 않습니다.
+따라서 `이이이야하` 다음 줄에 `뿌루루`를 쓰면 정수 출력 구절입니다.
 
-`i`와 `ua`는 피연산자를 꺼내고 출력하며, 자동으로 줄바꿈을 붙이지 않습니다.
-REPL은 출력과 다음 프롬프트를 구분하기 위해 필요한 줄바꿈을 추가합니다.
+`;`는 구절 결합을 끊습니다. `우라 야하야하`는 조건 블록 종료이고,
+`우라 야하 ; 야하`는 뺄셈 뒤 덧셈입니다. 단독 `야하야하`는 덧셈 두 번입니다.
+숫자나 블록 구절 내부에는 `;`를 넣을 수 없습니다.
+문자열·문자 리터럴과 주석은 지원하지 않습니다.
 
-문자열 리터럴, 문자 리터럴, 주석 문법은 지원하지 않습니다.
+## 반복과 조건
 
-## 정수 입력
+| 시작 | 끝 | 동작 |
+| --- | --- | --- |
+| `이야 야다야다` | `우라 야다야다` | 맨 위 정수가 0이 아닌 동안 반복 |
+| `이야 야하야하` | `우라 야하야하` | 정수를 꺼내 0이 아니면 본문 실행 |
 
-`ui`는 한 줄 전체를 읽고, 그 줄에는 정수 하나만 있어야 합니다.
+반복은 조건 값을 꺼내지 않고 시작할 때와 매 반복 뒤 검사합니다.
+본문은 다음 검사에 사용할 정수를 남겨야 합니다. 중첩은 최대 128단계입니다.
 
-```sh
-cargo run -- run examples/add_two_numbers.yaha --lang en
+```text
+하야하 뿌루뿌루뿌루 야하
+이야 야다야다
+    뿌루
+    이이이야하 뿌루루
+    하야하 뿌루 야하
+    우라 야하
+우라 야다야다
+얏
 ```
 
-`10`을 입력하고 Enter를 누른 다음, `2`를 입력하고 다시 Enter를 누르면 `12`가 출력됩니다.
+`321`을 출력합니다. 빈 줄과 들여쓰기는 제어 흐름에 영향을 주지 않습니다.
 
-`10 2`를 한 줄에 입력하면 오류가 발생합니다.
+## 입력
 
-파이프로 입력을 전달할 수도 있습니다.
+```text
+이이이야하
+이이이야하
+야하
+이이이야하 뿌루루
+얏
+```
 
 ```sh
-printf '10\n2\n' | cargo run -- run examples/add_two_numbers.yaha --lang en
+printf '12\n30\n' | cargo run -- run examples/add_two_numbers.yaha --lang ko
 ```
+
+출력은 `42`입니다. `12 30`을 한 줄에 입력하면 오류입니다.
 
 ## 배열
 
-대괄호 안에 정수 리터럴을 쉼표로 구분해 배열을 만듭니다.
-
 ```text
-[ura, ura yaha, ura yahayaha] ura yaha @ i
+[하야하 야하, 하야하 뿌루 야하, 하야하 뿌루뿌루 야하]
+하야하 뿌루 야하 @
+이이이야하 뿌루루
 ```
 
-배열 `[0, 1, 2]`를 만들고 인덱스 1의 값을 읽어 `1`을 출력합니다.
-인덱스는 0부터 시작합니다.
+배열 `[0, 1, 2]`의 인덱스 1을 읽어 `1`을 출력합니다.
+`[]`는 빈 배열이며 중첩 배열은 지원하지 않습니다.
 
-빈 배열은 `[]`이며, 중첩 배열은 지원하지 않습니다.
-
-| 명령 | 피연산자 순서: 스택 아래에서 위로 | 결과 |
+| 명령 | 피연산자: 스택 아래에서 위로 | 동작 |
 | --- | --- | --- |
-| `#` | 배열 | 길이를 스택에 넣음 |
-| `@` | 배열, 인덱스 | 해당 정수를 스택에 넣음 |
-| `=` | 배열, 인덱스, 값 | 해당 원소를 수정 |
+| `#` | 배열 | 길이 조회 |
+| `@` | 배열, 인덱스 | 정수 조회 |
+| `=` | 배열, 인덱스, 값 | 원소 수정 |
 
-세 명령은 모두 피연산자를 스택에서 꺼냅니다.
-배열을 다시 사용하려면 `puru`로 참조를 복제합니다.
-복제한 참조는 같은 배열을 공유하므로 수정 내용도 함께 보입니다.
+모두 피연산자를 꺼냅니다. 배열을 다시 쓰려면 `뿌루`로 참조를 복제합니다.
+복제한 참조는 같은 배열을 공유하므로 수정도 함께 보입니다. 인덱스는 0부터 시작합니다.
 
-잘못된 타입이나 인덱스는 실행 오류를 발생시킵니다.
+## 언어 설정과 오류
 
-## 언어 설정
-
-`run`과 `repl`에서 `--lang en`, `--lang ko`, `--lang ja`를 지정할 수 있습니다.
-한 프로그램에서는 한 언어의 표기를 사용합니다.
-
-기본 언어를 저장하려면 다음 명령을 실행합니다.
+`run`과 `repl`은 `--lang ko|en|ja`를 지원하며 한 프로그램에서는 한 표기를 사용합니다.
+옵션이 저장된 설정보다 우선하고, 둘 다 없으면 영어입니다. 기본값은 다음처럼 저장합니다.
 
 ```sh
 cargo run -- set lang ko
 ```
 
-설정은 TOML로 저장됩니다.
+설정 파일은 Linux에서 `$XDG_CONFIG_HOME/yahalang/config.toml` 또는
+`~/.config/yahalang/config.toml`, macOS에서 `~/Library/Application Support/yahalang/config.toml`,
+Windows에서 `%APPDATA%/yahalang/config.toml`입니다. 내용은 `lang = "ko"` 형식입니다.
 
-```toml
-lang = 'ko'
-```
-
-| 운영체제 | 설정 파일 |
-| --- | --- |
-| Linux | `$XDG_CONFIG_HOME/yahalang/config.toml`, 변수가 없으면 `~/.config/yahalang/config.toml` |
-| macOS | `~/Library/Application Support/yahalang/config.toml` |
-| Windows | `%APPDATA%/yahalang/config.toml` |
-
-실행 시 지정한 `--lang`이 저장된 설정보다 우선합니다.
-둘 다 없으면 영어를 사용합니다.
-
-## 오류 메시지
-
-기본 오류 스타일인 `usagi`는 `haa?`, `haa? haa?`, `ui` 같은 말소리를 출력합니다.
-
-원인을 확인하려면 `friendly`를 지정합니다.
+기본 `usagi` 오류 스타일은 말소리를 출력합니다. 원인을 보려면 다음 옵션을 씁니다.
 
 ```sh
-cargo run -- repl --lang en --error-style friendly
+cargo run -- repl --lang ko --error-style friendly
 ```
 
-빈 스택에서 `yaha`를 입력하면 다음 오류가 표시됩니다.
-
-```text
-runtime error at line 1, instruction 1: stack underflow
-```
-
-`--error-style usagi|friendly`는 `run`과 `repl`에서 모두 사용할 수 있습니다.
-
-## CI와 릴리스
-
-GitHub Actions에서 포맷 검사와 release 프로필 테스트를 실행하고,
-Linux x86-64, Windows x86-64, macOS Apple Silicon(aarch64)용 바이너리를 빌드합니다.
-PR, `master` 푸시, 버전 태그 푸시, 수동 실행으로 워크플로를 시작할 수 있습니다.
-빌드한 압축 파일은 워크플로의 Artifacts에서 내려받을 수 있습니다.
-
-릴리스를 배포하려면 `Cargo.toml`과 `Cargo.lock`의 버전을 갱신하고 변경 사항을 커밋해 푸시합니다.
-이어서 버전과 일치하는 태그를 푸시합니다.
-
-```sh
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-`0.1.0`은 배포할 패키지 버전으로 바꿉니다.
-태그는 `v` 뒤에 `Cargo.toml`의 버전을 붙인 값과 일치해야 합니다.
-모든 빌드가 성공하면 플랫폼별 압축 파일과 `SHA256SUMS`를 첨부한 GitHub Release를 생성합니다.
-`v0.2.0-beta.1` 같은 사전 배포 버전 태그는 프리릴리스를 생성합니다.
-수동 실행은 릴리스 배포 없이 빌드 아티팩트만 생성합니다.
+스택 부족, 잘못된 타입·입력·인덱스·문자 코드, 산술 오버플로와 0으로 나누기는 실행 오류입니다.
+닫히지 않은 숫자·블록, 잘못된 구절은 구문 오류입니다. 오류 위치는 실제 소스 줄을 가리킵니다.
 
 ## 예제
 
 | 파일 | 동작 |
 | --- | --- |
-| [hello_world.yaha](examples/hello_world.yaha) | `Hello, world!` 출력 |
-| [add_two_numbers.yaha](examples/add_two_numbers.yaha) | 정수 두 개를 별도 줄로 입력받아 합 출력 |
-| [integer_echo.yaha](examples/integer_echo.yaha) | 정수 하나를 입력받아 그대로 출력 |
-| [array_access.yaha](examples/array_access.yaha) | 배열 원소를 수정하고 조회 |
-| [truth_machine.yaha](examples/truth_machine.yaha) | `0`을 한 번 출력하고 종료하거나 `1`을 계속 출력 |
+| [hello_world.yaha](examples/hello_world.yaha) | `Hello, world!`와 줄바꿈 출력 |
+| [add_two_numbers.yaha](examples/add_two_numbers.yaha) | 정수 두 개의 합 출력 |
+| [integer_echo.yaha](examples/integer_echo.yaha) | 입력 정수 출력 |
+| [array_access.yaha](examples/array_access.yaha) | 배열 수정과 조회 |
+| [countdown.yaha](examples/countdown.yaha) | `321` 출력 |
+| [truth_machine.yaha](examples/truth_machine.yaha) | 0은 한 번 출력, 1은 계속 출력 |
 
-`truth_machine.yaha`에는 `0` 또는 `1`을 입력합니다.
-반복 출력은 Ctrl-C로 중단합니다.
+`truth_machine.yaha`에는 0 또는 1을 입력합니다. 반복 출력은 Ctrl-C로 중단합니다.
 
-언어 설계는 [DESIGN.md](DESIGN.md)를 참고하세요.
+## 검증과 릴리스
 
-테스트는 `cargo test`로 실행합니다.
+```sh
+cargo fmt --check
+cargo test --release
+```
 
-> [이 노래](https://www.youtube.com/watch?v=wFOjWCLPDDM)를 들으면서 하면 효율 x10000
+GitHub Actions는 포맷 검사와 release 테스트 후 Linux x86-64, Windows x86-64,
+macOS Apple Silicon용 바이너리를 빌드합니다. PR, `master` 푸시, 버전 태그, 수동 실행을 지원합니다.
+릴리스는 Cargo.toml과 Cargo.lock의 버전을 갱신하고 해당 `v` 태그를 푸시하면 생성합니다.
+성공한 릴리스에는 플랫폼별 압축 파일과 `SHA256SUMS`가 첨부됩니다.
+사전 배포 버전 태그는 프리릴리스이며 수동 실행은 아티팩트만 생성합니다.

@@ -1,234 +1,113 @@
 <h1 align="center">Yahalang</h1>
 
-<p align="center">
-  <img src="image.png" alt="Usagi from Chiikawa" width="280">
-</p>
+<p align="center"><img src="image.png" alt="Usagi from Chiikawa" width="280"></p>
+<p align="center">English · <a href="README.md">한국어</a> · <a href="README_JP.md">日本語</a></p>
 
-<p align="center">
-  <a href="README_EN.md">English</a> ·
-  <a href="README.md">한국어</a> ·
-  <a href="README_JP.md">日本語</a>
-</p>
+Yahalang is a stack language inspired by Usagi's sounds and rap refrain in *Chiikawa*.
+It supports Korean, English and Japanese spellings, checked signed 64-bit integers, and mutable integer arrays.
 
-Yahalang is a stack-based esoteric programming language inspired by Usagi's utterances in *Chiikawa*.
-It supports English, Korean, and Japanese command spellings, signed 64-bit integers, and mutable integer arrays.
+**Breaking grammar change:** old literals such as `ura yaha`, old commands such as `ui`, and line-number jumps are no longer supported. Convert existing programs to the new grammar; there is no automatic legacy mode.
+The complete specification is in [DESIGN.md](DESIGN.md) (Korean).
 
-## Build and run
-
-Install Rust and Cargo, then run these commands from the repository root:
+## Running
 
 ```sh
 cargo build
-cargo run -- run examples/hello_world.yaha --lang en
-```
-
-Output:
-
-```text
-Hello, world!
-```
-
-Start the REPL:
-
-```sh
+cargo run -- run examples/hello_world.yaha --lang ko
+cargo run -- run examples/countdown.yaha --lang ko
 cargo run -- repl --lang en
 ```
 
-```text
-yaha> ura yahayaha i
-2
-yaha> :q
-```
+Repository examples use Korean. The first two commands print `Hello, world!` followed by a newline, and `321`, respectively.
+The REPL runs each input line as an independent program, including its stack and arrays. Close blocks on that same input line. Exit with `:q` or `:quit`.
 
-Each REPL entry runs as a separate program.
-Stack values and arrays do not persist between entries.
-Use `:q` or `:quit` to exit.
+## Numbers and commands
 
-A source file runs as one program, with state shared across its lines.
+`hayaha` opens a number, each `ppuru` adds one, and `yaha` closes it.
+`hayaha yaha` is 0; `hayaha ppuruppuru yaha` is 2. Whitespace inside a number does not change its value.
 
-The examples below use English spellings.
-An explicit `--lang en` overrides any saved default language.
-
-## Numbers and the stack
-
-`ura` starts a number at zero.
-Each consecutive `yaha` increases it by one:
-
-| Source | Value |
-| --- | --- |
-| `ura` | 0 |
-| `ura yaha` | 1 |
-| `ura yahayaha` | 2 |
-| `ura yahayahayaha` | 3 |
-
-The `yaha` syllables within one number must be adjacent.
-A space ends the count.
-For example, `ura yaha yaha` pushes 1 and then performs addition; it does not push 2.
-
-This program pushes 1 and 2, adds them, and prints `3`:
-
-```text
-ura yaha ura yahayaha yaha i
-```
-
-Binary operations consume the top two values and push the result.
-Subtraction, division, and remainder use the lower value as the left operand.
-
-Overflow, division by zero, and insufficient stack values are runtime errors.
-
-## Commands
-
-| English | Korean | Japanese | Operation |
+| English | Korean | Japanese | Meaning |
 | --- | --- | --- | --- |
-| `ura` | `우라` | `ウラ` | Start an integer literal |
-| `yaha` / `yaha!` | `야하` / `야하!` | `ヤハ` / `ヤハ!` | Add / subtract |
-| `huung` | `후응` | `フゥン` | Multiply |
-| `hueung` | `후으응` | `フウン` | Integer division |
-| `jureuri` | `쥬르리` | `ジュルリ` | Remainder |
-| `fuun` | `후웅` | `フン` | Negate |
-| `puru` / `puru!` | `푸루` / `푸루!` | `プル` / `プル!` | Duplicate / discard the top value |
-| `haa?` | `하아?` | `ハァ?` | Execute the next instruction if the popped value is zero |
-| `puruya` / `puruya!` | `푸루야` / `푸루야!` | `プルャ` / `プルャ!` | Jump to a line / halt |
-| `ui` | `우이` | `ウイ` | Read an integer |
-| `i` | `이` | `イ` | Print an integer |
-| `ua` | `우아` | `ウア` | Print a Unicode character from its code point |
+| `hayaha … yaha` | `하야하 … 야하` | `ハヤハ … ヤハ` | Number, counting `ppuru` tokens |
+| `yaha` | `야하` | `ヤハ` | Add |
+| `ura yaha` | `우라 야하` | `ウラ ヤハ` | Subtract |
+| `hat` | `핫` | `ハッ` | Multiply |
+| `ura hat` | `우라 핫` | `ウラ ハッ` | Divide, truncating toward zero |
+| `ura hathat` | `우라 핫핫` | `ウラ ハッハッ` | Remainder |
+| `ura yat` | `우라 얏` | `ウラ ヤッ` | Negate |
+| `ppuru` / `ura ppuru` | `뿌루` / `우라 뿌루` | `プル` / `ウラ プル` | Duplicate / discard |
+| `iiiiyaha` | `이이이야하` | `イイイヤハ` | Read an integer |
+| `iiiiyaha ppururu` | `이이이야하 뿌루루` | `イイイヤハ プルル` | Print an integer |
+| `iiiiyaha urara` | `이이이야하 우라라` | `イイイヤハ ウララ` | Print a Unicode character |
+| `yat` | `얏` | `ヤッ` | Halt |
 
-`haa?` consumes its condition and controls one instruction on the same line.
-Conditions may be nested up to 128 levels.
+Binary operations consume two integers; the lower value is the left operand. Output consumes its operand without adding a newline. Input reads one integer per complete line.
+These English and Japanese spellings are language design choices, not official lyric transcriptions.
 
-Jump targets start at line 1.
-Blank lines count toward line numbers.
+## Phrases and blocks
 
-`i` and `ua` consume their operands and do not append a newline.
-The REPL adds a newline when needed to separate output from the next prompt.
+Write `iya` and `ura` without dashes; dashes are errors. Tokens can be joined, as in `ppuruppuru`, and the longest sound wins: `ppururu` is distinct from `ppuru`.
+Spaces and newlines do not break phrases. For example, `iiiiyaha` followed by `ppururu` on the next line is still integer output.
+Use `;` to break a phrase explicitly. `ura yahayaha` closes a conditional; `ura yaha ; yaha` subtracts, then adds. Standalone `yahayaha` adds twice.
+Semicolons cannot split number literals or block markers. Strings, character literals and comments are unsupported.
 
-There are no string literals, character literals, or comments.
+| Open | Close | Meaning |
+| --- | --- | --- |
+| `iya yadayada` | `ura yadayada` | While the top integer is nonzero |
+| `iya yahayaha` | `ura yahayaha` | Pop an integer; execute the body if nonzero |
 
-## Integer input
+A while loop does not pop its condition. It checks before entry and after each iteration; its body must leave an integer for the next check. Blocks may nest up to 128 levels. Blank lines and indentation have no control-flow meaning.
 
-Each `ui` reads one complete line containing a single integer.
-
-```sh
-cargo run -- run examples/add_two_numbers.yaha --lang en
+```text
+hayaha ppuruppuruppuru yaha
+iya yadayada
+    ppuru
+    iiiiyaha ppururu
+    hayaha ppuru yaha
+    ura yaha
+ura yadayada
+yat
 ```
 
-Enter `10`, press Enter, then enter `2` and press Enter again.
-The result is `12`.
+Prints `321`. To read and add two integers:
 
-Entering `10 2` on one line is invalid.
-
-Alternatively:
-
-```sh
-printf '10\n2\n' | cargo run -- run examples/add_two_numbers.yaha --lang en
+```text
+iiiiyaha
+iiiiyaha
+yaha
+iiiiyaha ppururu
+yat
 ```
 
 ## Arrays
 
-Array literals use square brackets and comma-separated integer literals:
-
 ```text
-[ura, ura yaha, ura yahayaha] ura yaha @ i
+[hayaha yaha, hayaha ppuru yaha, hayaha ppuruppuru yaha]
+hayaha ppuru yaha @
+iiiiyaha ppururu
 ```
 
-This creates `[0, 1, 2]`, reads the element at index 1, and prints `1`.
-Indices start at zero.
+Prints `1`. Arrays are zero-indexed; `[]` is empty and nested arrays are unsupported.
+`#` consumes an array and pushes its length. `@` consumes an array and index and pushes the selected integer. `=` consumes an array, index and integer value and updates that element.
+`ppuru` duplicates a shared reference, so modifications are visible through both references.
 
-`[]` creates an empty array.
-Nested arrays are not supported.
+## Settings and errors
 
-| Command | Operand order, bottom to top | Result |
-| --- | --- | --- |
-| `#` | array | Push the length |
-| `@` | array, index | Push the selected integer |
-| `=` | array, index, value | Update the selected element |
+`run` and `repl` accept `--lang en|ko|ja` and `--error-style usagi|friendly`.
+An explicit language overrides the saved setting; otherwise the default is English.
+Save a default with `cargo run -- set lang ko`.
+The TOML setting is `lang = "ko"` in `yahalang/config.toml` under `$XDG_CONFIG_HOME` (or `~/.config`) on Linux, `~/Library/Application Support` on macOS, or `%APPDATA%` on Windows.
 
-All three commands consume their operands.
-Use `puru` to retain an array reference for later use.
-Duplicated references share the same array, so mutations are visible through every reference.
+The default error style prints playful sounds; `friendly` shows details and physical source locations.
+Stack underflow, incorrect types, arithmetic overflow, zero divisors, invalid input, invalid array indices and invalid Unicode scalars cause runtime errors. Malformed literals, unknown sounds and mismatched blocks cause compile errors.
 
-Invalid types and indices produce runtime errors.
+## Examples and verification
 
-## Language settings
-
-Use `--lang en`, `--lang ko`, or `--lang ja` with `run` or `repl`.
-Use one spelling set consistently within a program.
-
-Save a default language:
+All files in [examples](examples) use `--lang ko`: Hello World, addition, integer echo, array mutation, countdown and a truth machine. The truth machine accepts 0 or 1; stop repeated output with Ctrl-C.
 
 ```sh
-cargo run -- set lang ko
+cargo fmt --check
+cargo test --release
 ```
 
-The setting is stored as TOML:
-
-```toml
-lang = 'ko'
-```
-
-| Platform | Configuration file |
-| --- | --- |
-| Linux | `$XDG_CONFIG_HOME/yahalang/config.toml`, or `~/.config/yahalang/config.toml` if unset |
-| macOS | `~/Library/Application Support/yahalang/config.toml` |
-| Windows | `%APPDATA%/yahalang/config.toml` |
-
-An explicit `--lang` takes precedence over the saved setting.
-Without either, English is used.
-
-## Errors
-
-The default `usagi` error style uses utterances such as `haa?`, `haa? haa?`, and `ui`.
-
-Select `friendly` to see the cause:
-
-```sh
-cargo run -- repl --lang en --error-style friendly
-```
-
-Entering `yaha` on an empty stack reports:
-
-```text
-runtime error at line 1, instruction 1: stack underflow
-```
-
-The `--error-style usagi|friendly` option is available for both `run` and `repl`.
-
-## CI and releases
-
-GitHub Actions checks formatting, runs tests in the release profile, and builds binaries for
-Linux x86-64, Windows x86-64, and macOS Apple Silicon (aarch64).
-The workflow runs on pull requests, pushes to `master`, version tags, and manual dispatches.
-Download build archives from the workflow's Artifacts section.
-
-To publish a release, update the version in `Cargo.toml` and `Cargo.lock`, then commit and push the changes.
-Push a matching version tag:
-
-```sh
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-Replace `0.1.0` with the package version.
-The tag must match `v` followed by the version in `Cargo.toml`.
-After all builds pass, the workflow creates a GitHub Release with platform archives and `SHA256SUMS`.
-Tags with prerelease versions, such as `v0.2.0-beta.1`, create prereleases.
-Manual workflow runs build artifacts without publishing a release.
-
-## Examples
-
-| File | Behavior |
-| --- | --- |
-| [hello_world.yaha](examples/hello_world.yaha) | Print `Hello, world!` |
-| [add_two_numbers.yaha](examples/add_two_numbers.yaha) | Read two integers on separate lines and print their sum |
-| [integer_echo.yaha](examples/integer_echo.yaha) | Read and print one integer |
-| [array_access.yaha](examples/array_access.yaha) | Update and read an array element |
-| [truth_machine.yaha](examples/truth_machine.yaha) | Print `0` once and halt, or print `1` indefinitely |
-
-For `truth_machine.yaha`, enter `0` or `1`.
-Stop the repeating output with Ctrl-C.
-
-See [DESIGN.md](DESIGN.md) for the language design.
-
-Run the test suite with `cargo test`.
-
-> Listen to [this song](https://www.youtube.com/watch?v=wFOjWCLPDDM) while coding for x10000 efficiency.
+GitHub Actions checks formatting, runs release tests and builds Linux x86-64, Windows x86-64 and macOS Apple Silicon binaries. To release, update Cargo.toml and Cargo.lock and push a matching `v` version tag. Releases include archives and `SHA256SUMS`; prerelease tags create prereleases. Manual runs only produce build artifacts.

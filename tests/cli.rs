@@ -17,7 +17,7 @@ fn temp_source(contents: &str) -> std::path::PathBuf {
 
 #[test]
 fn run_subcommand_executes_a_source_file_with_selected_language() {
-    let source = temp_source("우이 우이 야하 이");
+    let source = temp_source("이이이야하 이이이야하 야하 이이이야하 뿌루루");
     let mut child = Command::new(env!("CARGO_BIN_EXE_yahalang"))
         .arg("run")
         .arg(&source)
@@ -55,7 +55,7 @@ fn repl_runs_each_entered_line_and_separates_its_output_from_the_prompt() {
         .stdin
         .take()
         .expect("stdin is piped")
-        .write_all(b"ura yahayaha i\n:q\n")
+        .write_all(b"hayaha ppuruppuru yaha iiiiyaha ppururu\n:q\n")
         .expect("write REPL commands");
 
     let output = child.wait_with_output().expect("wait for yahalang repl");
@@ -124,7 +124,7 @@ fn set_language_persists_in_config_and_cli_option_overrides_it() {
         "lang = \"ja\"\n"
     );
 
-    let japanese_source = temp_source("ウイ ウイ ヤハ イ");
+    let japanese_source = temp_source("イイイヤハ イイイヤハ ヤハ イイイヤハ プルル");
     let mut run = Command::new(env!("CARGO_BIN_EXE_yahalang"))
         .arg("run")
         .arg(&japanese_source)
@@ -138,7 +138,7 @@ fn set_language_persists_in_config_and_cli_option_overrides_it() {
     assert!(japanese_output.status.success());
     assert_eq!(japanese_output.stdout, b"42");
 
-    let english_source = temp_source("ura yaha i");
+    let english_source = temp_source("hayaha ppuru yaha iiiiyaha ppururu");
     let override_output = Command::new(env!("CARGO_BIN_EXE_yahalang"))
         .arg("run")
         .arg(&english_source)

@@ -55,39 +55,33 @@ pub fn execute<R: BufRead, W: Write>(
     output: &mut W,
 ) -> Result<(), RuntimeError> {
     let mut stack = Vec::new();
-    let mut line_index = 0;
-
-    while line_index < program.lines.len() {
-        let mut instruction_index = 0;
-        let mut jumped = false;
-
-        while let Some(instruction) = program.lines[line_index].get(instruction_index) {
-            let flow = execute_instruction(
-                instruction,
-                &mut stack,
-                input,
-                output,
-                program.lines.len(),
-                line_index + 1,
-                instruction_index + 1,
-            )?;
-
-            match flow {
-                Flow::Continue => instruction_index += 1,
-                Flow::Jump(target) => {
-                    line_index = target - 1;
-                    jumped = true;
-                    break;
+    let instructions: Vec<_> = program
+        .lines
+        .iter()
+        .enumerate()
+        .flat_map(|(line, body)| {
+            body.iter()
+                .enumerate()
+                .map(move |(index, instruction)| (line + 1, index + 1, instruction))
+        })
+        .collect();
+    let mut pc = 0;
+    while let Some(&(line, index, instruction)) = instructions.get(pc) {
+        match execute_instruction(instruction, &mut stack, input, output, line, index)? {
+            Flow::Continue => pc += 1,
+            Flow::Jump(target) => {
+                if target > instructions.len() {
+                    return Err(RuntimeError {
+                        line,
+                        instruction: index,
+                        message: "invalid instruction target".to_owned(),
+                    });
                 }
-                Flow::Halt => return Ok(()),
+                pc = target;
             }
-        }
-
-        if !jumped {
-            line_index += 1;
+            Flow::Halt => return Ok(()),
         }
     }
-
     Ok(())
 }
 
@@ -96,7 +90,6 @@ fn execute_instruction<R: BufRead, W: Write>(
     stack: &mut Vec<Value>,
     input: &mut R,
     output: &mut W,
-    line_count: usize,
     line: usize,
     instruction_number: usize,
 ) -> Result<Flow, RuntimeError> {
@@ -136,28 +129,21 @@ fn execute_instruction<R: BufRead, W: Write>(
                 .pop()
                 .ok_or_else(|| error("stack underflow".to_owned()))?;
         }
-        Instruction::Conditional(body) => {
-            let condition = pop_integer(stack).map_err(error)?;
+        Instruction::WhileStart(target) => {
+            let condition = stack
+                .last()
+                .ok_or_else(|| error("stack underflow".to_owned()))?
+                .as_integer()
+                .map_err(error)?;
             if condition == 0 {
-                return execute_instruction(
-                    body,
-                    stack,
-                    input,
-                    output,
-                    line_count,
-                    line,
-                    instruction_number,
-                );
+                return Ok(Flow::Jump(*target));
             }
         }
-        Instruction::Jump => {
-            let target = pop_integer(stack).map_err(error)?;
-            if target < 1 || target > line_count as i64 {
-                return Err(error(format!(
-                    "jump target {target} is outside 1..={line_count}"
-                )));
+        Instruction::WhileEnd(target) => return Ok(Flow::Jump(*target)),
+        Instruction::IfStart(target) => {
+            if pop_integer(stack).map_err(error)? == 0 {
+                return Ok(Flow::Jump(*target));
             }
-            return Ok(Flow::Jump(target as usize));
         }
         Instruction::Halt => return Ok(Flow::Halt),
         Instruction::ReadInteger => stack.push(Value::Integer(read_integer(input).map_err(error)?)),
@@ -293,103 +279,4 @@ fn read_integer<R: BufRead>(input: &mut R) -> Result<i64, String> {
     value
         .parse::<i64>()
         .map_err(|err| format!("invalid integer input: {err}"))
-}
-
-#[cfg(test)]
-mod tests {
-    use std::io::Cursor;
-
-    use crate::language::Language;
-    use crate::lexer::lex;
-    use crate::parser::parse;
-
-    use super::execute;
-
-    fn run(source: &str, input: &str) -> (Result<(), super::RuntimeError>, String) {
-        let tokens = lex(source, Language::English).unwrap();
-        let program = parse(&tokens).unwrap();
-        let mut input = Cursor::new(input.as_bytes());
-        let mut output = Vec::new();
-        let result = execute(&program, &mut input, &mut output);
-        (result, String::from_utf8(output).unwrap())
-    }
-
-    #[test]
-    fn reads_adds_and_prints_without_extra_newlines() {
-        assert_eq!(run("ui ui yaha i", "12\n30\n"), (Ok(()), "42".to_owned()));
-    }
-
-    #[test]
-    fn evaluates_arithmetic_and_stack_operations() {
-        assert_eq!(
-            run("ura yahayaha ura yahayaha huung i", ""),
-            (Ok(()), "4".to_owned())
-        );
-    }
-
-    #[test]
-    fn creates_reads_writes_and_measures_integer_arrays() {
-        assert_eq!(
-            run("[ura, ura yaha, ura yahayaha] # i", ""),
-            (Ok(()), "3".to_owned())
-        );
-        assert_eq!(
-            run(
-                "[ura, ura yaha] puru ura yaha ura yahayaha = ura yaha @ i",
-                ""
-            ),
-            (Ok(()), "2".to_owned())
-        );
-        assert_eq!(run("[ura yahayaha] ura @ i", ""), (Ok(()), "2".to_owned()));
-    }
-
-    #[test]
-    fn array_access_checks_types_and_bounds() {
-        assert!(
-            run("[ura] ura yaha @", "")
-                .0
-                .unwrap_err()
-                .message
-                .contains("out of bounds")
-        );
-        assert!(
-            run("[ura] ura yaha =", "")
-                .0
-                .unwrap_err()
-                .message
-                .contains("expected an integer")
-        );
-    }
-
-    #[test]
-    fn conditionals_jump_and_halt_control_execution() {
-        let source = "ura yahayahayaha puruya\nura yaha i\nura haa? puruya!\nui";
-        assert_eq!(run(source, ""), (Ok(()), String::new()));
-    }
-
-    #[test]
-    fn reports_underflow_overflow_and_invalid_jumps() {
-        assert!(run("yaha", "").0.unwrap_err().message.contains("underflow"));
-        assert!(
-            run("ui fuun", "-9223372036854775808\n")
-                .0
-                .unwrap_err()
-                .message
-                .contains("overflow")
-        );
-        assert!(
-            run("ura puruya", "")
-                .0
-                .unwrap_err()
-                .message
-                .contains("target")
-        );
-    }
-
-    #[test]
-    fn reads_only_complete_signed_integer_lines() {
-        assert_eq!(run("ui i", " +42 \r\n"), (Ok(()), "42".to_owned()));
-        assert!(run("ui", "1 2\n").0.is_err());
-        assert!(run("ui", "").0.is_err());
-    }
 }

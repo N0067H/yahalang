@@ -1,155 +1,186 @@
-# Yahalang
+# Yahalang 우사기랩 문법
 
-Yahalang is a small stack-based language inspired by Usagi's sounds in
-*Chiikawa*.
+사용자가 제공한 가사와 후렴을 기준으로 재설계한 현재 실행기의 문법이다.
+이전 버전의 숫자·명령·줄 번호 점프 문법과는 호환되지 않는다.
+기존 소스는 새 문법으로 변환해야 하며, 이전 문법을 자동 감지하지 않는다.
 
-A program is made from short utterances. The words carry the commands, while
-spaces and line breaks make them easier to read.
+## 기본 방향
 
-## How to read a program
+스택과 정수 배열이라는 실행 모델은 유지한다. 명령 어휘는 가사에 나온
+`하야하`, `뿌루`, `야하`, `이이이야하`, `뿌루루`, `우라라`, `이야`,
+`야다야다`, `우라`, `핫`, `얏`으로 다시 구성한다.
+단독 소리뿐 아니라 짧은 구절 전체를 명령으로 사용한다.
 
-Yahalang keeps its values on a stack. Think of the stack as a pile: most
-commands take values from the top, do something, and put the result back.
+한국어를 기준 표기로 삼는다. 영어·일본어는 아래 대응표의 표기를 사용한다.
+`뿌루`는 숫자 세기, `뿌루루`는 정수 출력 접미어로 서로 다른 토큰이다.
 
-A number starts with `ura`, then uses repeated `yaha` sounds to count up from
-zero:
+## 표기와 경계
 
-```text
-ura              means 0
-ura yaha         means 1
-ura yahayaha     means 2
-```
+- 대시 없이 `이야`, `우라`로 쓴다. ASCII 하이픈은 구문에 포함하지 않으며 오류다.
+- `이이이야하`처럼 실제로 반복한 음절은 줄이지 않는다.
+- 공백과 줄바꿈은 구분자이며, 줄 번호에 실행 의미를 부여하지 않는다.
+- 붙여 쓴 `야하야하`, `핫핫핫`, `뿌루뿌루`도 각각의 토큰으로 분리한다.
+- 가장 긴 소리를 먼저 인식한다. `뿌루루`를 `뿌루`로 잘라 읽지 않는다.
+- `야다`와 `야하`는 별개다. `야다야다`는 블록 문법에서만 쓴다.
+- 정의되지 않은 소리와 문장부호는 오류다. 괄호 속 추임새나 `Yeah`는 자동으로 무시하지 않는다.
 
-The repeated `yaha` syllables that make one number stay together. A space
-ends that number and starts another command. For example:
+## 숫자
 
-```text
-ura yaha yaha
-```
+`하야하`로 열고 `야하`로 닫는다. 그 사이의 `뿌루` 개수가 값이다.
 
-This pushes 1, then adds the top two values. It does not mean the number 2.
+| 코드 | 값 |
+| --- | --- |
+| `하야하 야하` | 0 |
+| `하야하 뿌루 야하` | 1 |
+| `하야하 뿌루뿌루 야하` | 2 |
+| `하야하 뿌루뿌루뿌루 야하` | 3 |
 
-Commands can be separated with spaces or written together when their boundaries
-are clear. We prefer spaces in examples so each command is easy to spot. A new
-line starts the next instruction line; blank lines still count when a program
-jumps to a line number.
+숫자 안의 공백과 줄바꿈은 값에 영향을 주지 않는다. 닫는 `야하`가 필수라서
+숫자 바로 뒤에 덧셈 명령 `야하`가 와도 경계가 명확하다.
+음수는 양수를 만든 뒤 `우라 얏`으로 부호를 바꾼다.
 
-## The core vocabulary
+## 명령
 
-The same commands can be written in Korean, English, or Japanese.
-English uses romanized spellings, while Japanese uses katakana.
+이항 연산은 아래 값을 a, 맨 위 값을 b로 꺼내 a 연산 b를 넣는다.
+출력과 입력은 기존과 같이 자동 줄바꿈 없는 정수·문자 출력과 한 줄 정수 입력이다.
 
-These spellings represent Usagi's sounds. The English forms are practical
-romanizations, not an official English transcription.
+| 구절 | 동작 |
+| --- | --- |
+| `야하` | 덧셈 |
+| `야하야하` | 덧셈 두 번. 별도의 명령이 아니다 |
+| `우라 야하` | 뺄셈 |
+| `핫` | 곱셈 |
+| `우라 핫` | 정수 나눗셈, 0 방향으로 버림 |
+| `우라 핫핫` | 나머지 |
+| `우라 얏` | 맨 위 정수의 부호 반전 |
+| `뿌루` | 맨 위 값 복제 |
+| `우라 뿌루` | 맨 위 값 버리기 |
+| `이이이야하` | 정수 하나 입력 |
+| `이이이야하 뿌루루` | 맨 위 정수 출력 |
+| `이이이야하 우라라` | 맨 위 정수를 유니코드 문자로 출력 |
+| `얏` | 프로그램 종료 |
 
-| Role | Korean | English | Japanese |
-| --- | --- | --- | --- |
-| Start a number | `우라` | `ura` | `ウラ` |
-| Count / add | `야하` | `yaha` | `ヤハ` |
-| Subtract | `야하!` | `yaha!` | `ヤハ!` |
-| Multiply | `후응` | `huung` | `フゥン` |
-| Divide | `후으응` | `hueung` | `フウン` |
-| Remainder | `쥬르리` | `jureuri` | `ジュルリ` |
-| Negate | `후웅` | `fuun` | `フン`* |
-| Duplicate / discard | `푸루` / `푸루!` | `puru` / `puru!` | `プル` / `プル!` |
-| Conditional | `하아?` | `haa?` | `ハァ?` |
-| Jump / stop | `푸루야` / `푸루야!` | `puruya` / `puruya!` | `プルャ` / `プルャ!` |
-| Read an integer | `우이` | `ui` | `ウイ` |
-| Print an integer | `이` | `i` | `イ` |
-| Print a character | `우아` | `ua` | `ウア` |
+`우라`는 항상 다음 소리와 결합하는 접두어다. 단독 `우라`는 오류다.
+`우라 핫핫`을 `우라 핫`보다 먼저 인식한다.
+`우라 핫핫핫`은 나머지 연산 뒤 곱셈 한 번으로 읽는다.
+`이이이야하` 뒤의 다음 토큰이 `뿌루루` 또는 `우라라`면 출력 구절로
+묶고, 그 외에는 입력 명령 하나로 읽는다. 줄바꿈은 이 규칙을 바꾸지 않는다.
 
-*The Japanese negation spelling is chosen to keep it distinct from
-multiplication. These command spellings are design choices, not strict
-phonetic transcriptions.
+## 블록
 
-Use one language's spellings consistently in a program. Punctuation stays
-ASCII (`!` and `?`) in every spelling set.
+| 여는 구절 | 닫는 구절 | 의미 |
+| --- | --- | --- |
+| `이야 야다야다` | `우라 야다야다` | 맨 위 정수가 0이 아닌 동안 반복 |
+| `이야 야하야하` | `우라 야하야하` | 조건 값을 꺼내 0이 아니면 한 번 실행 |
 
-## Integer arrays
+반복 조건은 값을 꺼내지 않는다. 반복 시작과 매회 본문 종료 시 맨 위 정수를
+검사한다. 본문은 다음 검사에 사용할 정수를 남겨야 한다. 조건 검사 시 스택이
+비었거나 정수가 아니면 오류다. 반복을 건너뛰는 0도 스택에 남는다.
+조건 블록은 조건 값을 한 번 꺼내므로 반복 블록과 차이가 있다.
+블록은 중첩할 수 있으며 서로 다른 종류의 닫는 구절을 혼용할 수 없다.
+최대 중첩 깊이는 128이다.
 
-Square brackets create an array of integer values. Separate items with commas;
-each item uses the normal `ura` number form. `[]` creates an empty array.
+접두어로 시작하는 블록 구절은 일반 명령보다 먼저 인식한다.
+따라서 `우라 야하야하`는 조건 블록 종료이며 뺄셈 뒤 덧셈이 아니다.
+뺄셈 뒤 덧셈이 필요하면 아래의 `;` 명령 경계를 쓴다.
 
-```text
-[ura, ura yaha, ura yahayaha]
-```
+## 명시적 경계와 배열
 
-This creates `[0, 1, 2]` and pushes an array reference onto the stack. Arrays
-are zero-indexed. `#` consumes an array reference and pushes its length. `@`
-consumes an array reference followed by an index and pushes the selected
-integer. `=` consumes an array reference, an index, and a value, then stores
-the value at that position. Duplicate an array reference with `puru` when it
-needs to be used again:
+`;`는 구절 결합을 막는 명시적 명령 경계다. 공백과 달리 의미가 있다.
+예를 들어 `이이이야하 ; 뿌루`는 입력 후 복제이고,
+`우라 야하 ; 야하`는 뺄셈 후 덧셈이다. 숫자나 블록 구절 내부에는 쓸 수 없다.
 
-```text
-[ura, ura yaha] puru ura yaha ura yahayaha = ura yaha @ i
-```
+기존 배열 표기와 연산은 유지한다. 배열 리터럴의 원소만 새 숫자 문법으로 바꾼다.
+`[]`는 빈 배열이며 중첩 배열은 지원하지 않는다.
+`#`는 길이, `@`는 조회, `=`는 수정을 뜻한다.
+조회는 배열·인덱스, 수정은 배열·인덱스·값 순서로 스택에 넣는다.
+모두 피연산자를 소비하며, `뿌루`로 복제한 배열 참조는 같은 배열을 공유한다.
 
-This changes element 1 to 2 and prints it. Using a non-array where an array is
-required, or an index outside the array, stops the program with an error.
-Array literals currently contain integers; nested arrays are not supported.
-
-## What the commands do
-
-`yaha` adds the top two numbers. `yaha!` subtracts the top number from the
-value below it.
-
-`huung`, `hueung`, and `jureuri` multiply, divide, and take the remainder.
-`fuun` changes the sign of the top number.
-
-`puru` copies the top value, and `puru!` removes it.
-`haa?` checks the top value and removes it.
-If the value was zero, `haa?` runs the next command on the same line.
-Conditions may be nested up to 128 levels. Deeper nesting is a parse error.
-
-`puruya` takes a line number from the stack and jumps there.
-`puruya!` ends the program.
-
-`ui` reads an integer. `i` prints an integer, and `ua` prints a character.
-Commands that need values fail if the stack does not have enough.
-Invalid input, division by zero, arithmetic overflow, and invalid jump
-targets also stop the program with an error.
-
-## Running programs
-
-`yahalang run <file>` runs a source file. `yahalang repl` starts the
-interactive one-line REPL. Both commands accept `--lang en`, `--lang ko`, or
-`--lang ja`.
-
-Set a default language with `yahalang set lang ko`. The setting is saved in
-`config.toml` under the user's configuration directory, inside a `yahalang`
-folder. On Linux this is `$XDG_CONFIG_HOME/yahalang/config.toml`, or
-`~/.config/yahalang/config.toml` when `XDG_CONFIG_HOME` is unset. An explicit
-`--lang` option overrides the saved default; without either, English is used.
-
-## Example: add two inputs
-
-This program reads two integers, adds them, and prints the sum:
+## 예시 1: 2 + 3 = 5
 
 ```text
-ui ui yaha i
+하야하 뿌루뿌루 야하
+하야하 뿌루뿌루뿌루 야하
+야하
+이이이야하 뿌루루
+얏
 ```
 
-For input `12` and `30`, it prints `42`.
+출력: `5`
 
-## Example: build and add small numbers
+## 예시 2: 두 정수 입력받아 더하기
 
 ```text
-ura yahayaha
-ura yaha yaha
+이이이야하
+이이이야하
+야하
+이이이야하 뿌루루
+얏
 ```
 
-The first line pushes 2.
-The second pushes 1, then adds it to 2, leaving 3 on the stack.
+`12`와 `30`을 각각 한 줄에 입력하면 `42`를 출력한다.
 
-The space before the last `yaha` makes it an addition command rather than
-part of the number.
+## 예시 3: 후렴 형태의 카운트다운
 
-## Future expressive forms
+```text
+하야하 뿌루뿌루뿌루 야하
+이야 야다야다
+    뿌루
+    이이이야하 뿌루루
+    하야하 뿌루 야하
+    우라 야하
+우라 야다야다
+얏
+```
 
-Longer cries may become expressive commands later. Candidates include
-`ウララララララララ！`, `ヤァァァァッ！`, `ハァァァァッ！`,
-`ヤハヤハヤハ！`, `ヤハッ！ ウハッ！`, `プルルルルルル`, `ヤプ`,
-`ミヤァァ`, `フフーン`, `ハァッハッ！`, and `ユフフフフフフフフフ`.
+출력: `321`
 
-These forms are not part of the core language yet.
+처음 3을 넣는다. 본문은 현재 값을 복제해 출력하고 1을 뺀다.
+맨 위 값이 0이 되면 반복을 끝낸다. 실제 줄 번호에 의존하지 않는다.
+
+## 예시 4: 배열의 두 번째 값 출력
+
+```text
+[하야하 뿌루 야하, 하야하 뿌루뿌루 야하]
+하야하 뿌루 야하 @
+이이이야하 뿌루루
+얏
+```
+
+출력: `2`
+
+## 오류와 호환성
+
+정수는 부호 있는 64비트다. 스택 부족, 잘못된 타입, 산술 오버플로,
+0으로 나누기, 잘못된 입력·배열 인덱스·문자 코드 포인트는 실행 오류다.
+닫히지 않은 숫자·블록, 대응하지 않는 블록 끝, 알 수 없는 소리는 구문 오류다.
+
+가사 전체를 그대로 실행 가능한 프로그램으로
+만드는 것은 목표가 아니다. 가사의 반복 구절을 읽을 수 있는 코드 구조로 옮긴다.
+
+## 언어별 표기
+
+`--lang ko|en|ja`로 한 프로그램의 표기를 선택한다. 기존 CLI와 같이 기본값은
+영어이며, 저장된 `lang` 설정이나 명시적인 옵션으로 바꾼다.
+아래 영어·일본어 표기는 이 언어를 위한 설계 표기이며 공식 가사 표기가 아니다.
+
+| 한국어 | 영어 | 일본어 |
+| --- | --- | --- |
+| 하야하 | hayaha | ハヤハ |
+| 뿌루 | ppuru | プル |
+| 뿌루루 | ppururu | プルル |
+| 야하 | yaha | ヤハ |
+| 이이이야하 | iiiiyaha | イイイヤハ |
+| 우라라 | urara | ウララ |
+| 이야 | iya | イヤ |
+| 야다 | yada | ヤダ |
+| 우라 | ura | ウラ |
+| 핫 | hat | ハッ |
+| 얏 | yat | ヤッ |
+
+## 실행 구조
+
+블록은 파싱 시 명령 인덱스로 연결한다. 반복 실행은 프로그램 카운터를 사용하므로
+반복 횟수만큼 Rust 호출 스택이 늘어나지 않는다. 원래 소스의 줄별 명령 위치는
+실행 오류 진단에 보존한다. 반복 조건을 다시 검사하다 오류가 나면 여는 구절의
+위치를 보고한다. 빈 줄이나 들여쓰기를 바꿔도 제어 흐름은 바뀌지 않는다.

@@ -7,8 +7,7 @@ macro_rules! define_token_kinds {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         pub enum TokenKind {
             $($kind,)+
-            Bang,
-            Question,
+            Semicolon,
             LeftBracket,
             RightBracket,
             Comma,
@@ -30,8 +29,7 @@ macro_rules! define_token_kinds {
                             Language::Japanese => $japanese,
                         }),
                     )+
-                    Self::Bang => Some("!"),
-                    Self::Question => Some("?"),
+                    Self::Semicolon => Some(";"),
                     Self::LeftBracket => Some("["),
                     Self::RightBracket => Some("]"),
                     Self::Comma => Some(","),
@@ -46,18 +44,17 @@ macro_rules! define_token_kinds {
 }
 
 define_token_kinds! {
+    Hayaha => ["hayaha", "하야하", "ハヤハ"],
     Ura => ["ura", "우라", "ウラ"],
     Yaha => ["yaha", "야하", "ヤハ"],
-    Ha => ["haa", "하아", "ハァ"],
-    Puru => ["puru", "푸루", "プル"],
-    Puruya => ["puruya", "푸루야", "プルャ"],
-    Huung => ["huung", "후응", "フゥン"],
-    Hueung => ["hueung", "후으응", "フウン"],
-    Jureuri => ["jureuri", "쥬르리", "ジュルリ"],
-    Fuun => ["fuun", "후웅", "フン"],
-    Ui => ["ui", "우이", "ウイ"],
-    I => ["i", "이", "イ"],
-    Ua => ["ua", "우아", "ウア"],
+    Ppuru => ["ppuru", "뿌루", "プル"],
+    Ppururu => ["ppururu", "뿌루루", "プルル"],
+    Iiiiyaha => ["iiiiyaha", "이이이야하", "イイイヤハ"],
+    Urara => ["urara", "우라라", "ウララ"],
+    Iya => ["iya", "이야", "イヤ"],
+    Yada => ["yada", "야다", "ヤダ"],
+    Hat => ["hat", "핫", "ハッ"],
+    Yat => ["yat", "얏", "ヤッ"],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
