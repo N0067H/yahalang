@@ -1,13 +1,16 @@
-use std::fs;
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use clap::{Parser, Subcommand, ValueEnum};
 use yahalang::executor::execute;
 use yahalang::language::Language;
 use yahalang::lexer::lex;
 use yahalang::parser::parse;
+
+static NEXT_CONFIG_TEMP_FILE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Parser)]
 #[command(name = "yahalang", version, about = "Run Yahalang programs")]
@@ -162,10 +165,58 @@ fn set_config(key: &str, language: CliLanguage) -> Result<PathBuf, String> {
         .ok_or_else(|| "config path has no parent directory".to_owned())?;
     fs::create_dir_all(parent)
         .map_err(|error| format!("could not create {}: {error}", parent.display()))?;
-    fs::write(&path, format!("lang = \"{}\"\n", language.code()))
-        .map_err(|error| format!("could not write {}: {error}", path.display()))?;
+    write_config_atomically(
+        &path,
+        format!("lang = \"{}\"\n", language.code()).as_bytes(),
+    )
+    .map_err(|error| format!("could not write {}: {error}", path.display()))?;
 
     Ok(path)
+}
+
+fn write_config_atomically(path: &PathBuf, contents: &[u8]) -> io::Result<()> {
+    let (temp_path, file) = create_config_temp_file(path)?;
+    let result = write_and_replace_config(file, &temp_path, path, contents);
+
+    if result.is_err() {
+        let _ = fs::remove_file(&temp_path);
+    }
+
+    result
+}
+
+fn write_and_replace_config(
+    mut file: File,
+    temp_path: &Path,
+    path: &Path,
+    contents: &[u8],
+) -> io::Result<()> {
+    file.write_all(contents)?;
+    file.sync_all()?;
+    drop(file);
+    fs::rename(temp_path, path)
+}
+
+fn create_config_temp_file(path: &Path) -> io::Result<(PathBuf, File)> {
+    for _ in 0..100 {
+        let sequence = NEXT_CONFIG_TEMP_FILE.fetch_add(1, Ordering::Relaxed);
+        let temp_path = path.with_extension(format!("toml.{}.{sequence}.tmp", std::process::id()));
+
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp_path)
+        {
+            Ok(file) => return Ok((temp_path, file)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+
+    Err(io::Error::new(
+        io::ErrorKind::AlreadyExists,
+        "could not create a unique temporary config file",
+    ))
 }
 
 fn parse_language(value: &str) -> Option<CliLanguage> {
