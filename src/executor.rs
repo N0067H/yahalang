@@ -1,10 +1,11 @@
 use std::cell::RefCell;
-use std::io::{BufRead, Write};
+use std::io::{BufRead, Read, Write};
 use std::rc::Rc;
 
 use crate::parser::{Instruction, Program};
 
 type Array = Rc<RefCell<Vec<i64>>>;
+const MAX_INTEGER_INPUT_BYTES: usize = 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Value {
@@ -284,8 +285,12 @@ fn binary(stack: &mut Vec<Value>, operation: BinaryOperation) -> Result<(), Stri
 fn read_integer<R: BufRead>(input: &mut R) -> Result<i64, String> {
     let mut bytes = Vec::new();
     let length = input
+        .take((MAX_INTEGER_INPUT_BYTES + 1) as u64)
         .read_until(b'\n', &mut bytes)
         .map_err(|err| format!("input failed: {err}"))?;
+    if length > MAX_INTEGER_INPUT_BYTES {
+        return Err("integer input line is too long".to_owned());
+    }
     if length == 0 {
         return Err("integer input reached EOF".to_owned());
     }
