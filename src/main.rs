@@ -174,7 +174,7 @@ fn set_config(key: &str, language: CliLanguage) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-fn write_config_atomically(path: &PathBuf, contents: &[u8]) -> io::Result<()> {
+fn write_config_atomically(path: &Path, contents: &[u8]) -> io::Result<()> {
     let (temp_path, file) = create_config_temp_file(path)?;
     let result = write_and_replace_config(file, &temp_path, path, contents);
 
@@ -292,7 +292,7 @@ fn repl(language: Language, error_style: ErrorStyle) -> io::Result<()> {
         match command {
             ":quit" | ":q" => break,
             "" => {}
-            _ => run_repl_source(command, language, error_style, &mut input, &mut output),
+            _ => run_repl_source(command, language, error_style, &mut input, &mut output)?,
         }
     }
 
@@ -305,12 +305,12 @@ fn run_repl_source<R: BufRead, W: Write>(
     error_style: ErrorStyle,
     input: &mut R,
     output: &mut W,
-) {
+) -> io::Result<()> {
     let program = match compile(source, language, error_style) {
         Ok(program) => program,
         Err(error) => {
             eprintln!("{error}");
-            return;
+            return Ok(());
         }
     };
 
@@ -321,13 +321,15 @@ fn run_repl_source<R: BufRead, W: Write>(
         .last_byte
         .is_some_and(|last_byte| last_byte != b'\n')
     {
-        let _ = writeln!(repl_output);
-        let _ = repl_output.flush();
+        writeln!(repl_output)?;
+        repl_output.flush()?;
     }
 
     if let Err(error) = result {
         eprintln!("{}", format_runtime_error(error, error_style));
     }
+
+    Ok(())
 }
 
 struct ReplOutput<'a, W> {
