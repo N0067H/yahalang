@@ -160,6 +160,49 @@ fn stack_commands_duplicate_discard_and_halt() {
 }
 
 #[test]
+fn swap_spellings_produce_the_same_instruction() {
+    let expected = compile("이야 뿌루");
+
+    for (language, source) in [
+        (Language::Korean, "이야 뿌루"),
+        (Language::English, "iya ppuru"),
+        (Language::Japanese, "イヤ プル"),
+    ] {
+        assert_eq!(parse(&lex(source, language).unwrap()).unwrap(), expected);
+    }
+}
+
+#[test]
+fn swap_preserves_lower_values_and_reverses_operands() {
+    let source =
+        "이이이야하 이이이야하 이이이야하 이야 뿌루 우라 야하 이이이야하 뿌루루 이이이야하 뿌루루";
+
+    assert_eq!(run(source, "9\n2\n7\n"), (Ok(()), "59".to_owned()));
+}
+
+#[test]
+fn swap_keeps_array_aliases() {
+    let source = "[하야하 야하] 뿌루 하야하 뿌루 야하 이야 뿌루 이야 뿌루 하야하 야하 이야 뿌루 = 하야하 야하 @ 이이이야하 뿌루루";
+
+    assert_eq!(run(source, ""), (Ok(()), "1".to_owned()));
+}
+
+#[test]
+fn swap_reports_underflow() {
+    for source in ["이야 뿌루", "하야하 야하 이야 뿌루"] {
+        assert_eq!(run(source, "").0.unwrap_err().message, "stack underflow");
+    }
+}
+
+#[test]
+fn swap_respects_phrase_boundaries_inside_blocks() {
+    let source = "하야하 뿌루 야하 이야 야하야하 이이이야하 이이이야하 이야\n뿌루 우라 야하 이이이야하 뿌루루 우라 야하야하";
+
+    assert_eq!(run(source, "2\n7\n"), (Ok(()), "5".to_owned()));
+    assert!(malformed("이야 ; 뿌루"));
+}
+
+#[test]
 fn while_rechecks_the_top_without_consuming_it() {
     let source = include_str!("../examples/countdown.yaha");
     assert_eq!(run(source, ""), (Ok(()), "321".to_owned()));

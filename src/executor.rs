@@ -131,6 +131,7 @@ fn execute_instruction<R: BufRead, W: Write>(
 
             stack.push(value);
         }
+        Instruction::Swap => swap(stack).map_err(error)?,
         Instruction::Discard => {
             stack
                 .pop()
@@ -241,6 +242,33 @@ impl Value {
             Self::Integer(value) => Ok(*value),
             Self::Array(_) => Err("expected an integer but found an array".to_owned()),
         }
+    }
+}
+
+fn swap(stack: &mut [Value]) -> Result<(), String> {
+    let length = stack.len();
+    if length < 2 {
+        return Err("stack underflow".to_owned());
+    }
+
+    stack.swap(length - 2, length - 1);
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Value, swap};
+
+    #[test]
+    fn swap_underflow_preserves_the_stack() {
+        let mut empty = Vec::new();
+        assert!(swap(&mut empty).is_err());
+        assert!(empty.is_empty());
+
+        let mut single = vec![Value::Integer(7)];
+        assert!(swap(&mut single).is_err());
+        assert_eq!(single, vec![Value::Integer(7)]);
     }
 }
 

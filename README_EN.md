@@ -37,6 +37,7 @@ No `ppuru` means 0 and two of them make 2, regardless of any spaces or line brea
 | `ura hathat` | `우라 핫핫` | `ウラ ハッハッ` | Remainder |
 | `ura yat` | `우라 얏` | `ウラ ヤッ` | Negate |
 | `ppuru` / `ura ppuru` | `뿌루` / `우라 뿌루` | `プル` / `ウラ プル` | Duplicate / discard |
+| `iya ppuru` | `이야 뿌루` | `イヤ プル` | Swap the top two values |
 | `iiiiyaha` | `이이이야하` | `イイイヤハ` | Read an integer |
 | `iiiiyaha ppururu` | `이이이야하 뿌루루` | `イイイヤハ プルル` | Print an integer |
 | `iiiiyaha urara` | `이이이야하 우라라` | `イイイヤハ ウララ` | Print a Unicode character |

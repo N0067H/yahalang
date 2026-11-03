@@ -19,6 +19,7 @@ pub enum Instruction {
     Negate,
     Duplicate,
     Discard,
+    Swap,
     /// Flat instruction offset after the matching loop end.
     WhileStart(usize),
     /// Flat instruction offset of the matching loop start.
@@ -121,7 +122,7 @@ impl Parser {
             return self.close_block(closing, marker);
         }
 
-        if self.at(TokenKind::Iya) {
+        if self.at(TokenKind::Iya) && !self.phrase(&[TokenKind::Iya, TokenKind::Ppuru]) {
             self.block(depth)?;
             return Ok(false);
         }
@@ -212,6 +213,7 @@ impl Parser {
             Yaha => Ok(Instruction::Add),
             Hat => Ok(Instruction::Multiply),
             Ppuru => Ok(Instruction::Duplicate),
+            Iya if self.take(Ppuru) => Ok(Instruction::Swap),
             Yat => Ok(Instruction::Halt),
 
             Ura => self.prefixed_instruction(),
