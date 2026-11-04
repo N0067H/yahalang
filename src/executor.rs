@@ -46,6 +46,9 @@ enum BinaryOperation {
     Multiply,
     Divide,
     Remainder,
+    CompareEqual,
+    CompareLess,
+    CompareGreater,
 }
 
 pub fn execute<R: BufRead, W: Write>(
@@ -109,6 +112,12 @@ fn execute_instruction<R: BufRead, W: Write>(
         Instruction::Multiply => binary(stack, BinaryOperation::Multiply).map_err(error)?,
         Instruction::Divide => binary(stack, BinaryOperation::Divide).map_err(error)?,
         Instruction::Remainder => binary(stack, BinaryOperation::Remainder).map_err(error)?,
+
+        Instruction::CompareEqual => binary(stack, BinaryOperation::CompareEqual).map_err(error)?,
+        Instruction::CompareLess => binary(stack, BinaryOperation::CompareLess).map_err(error)?,
+        Instruction::CompareGreater => {
+            binary(stack, BinaryOperation::CompareGreater).map_err(error)?
+        }
 
         Instruction::Negate => {
             let value = stack
@@ -301,6 +310,9 @@ fn binary(stack: &mut Vec<Value>, operation: BinaryOperation) -> Result<(), Stri
         BinaryOperation::Multiply => left.checked_mul(right),
         BinaryOperation::Divide => left.checked_div(right),
         BinaryOperation::Remainder => left.checked_rem(right),
+        BinaryOperation::CompareEqual => Some(i64::from(left == right)),
+        BinaryOperation::CompareLess => Some(i64::from(left < right)),
+        BinaryOperation::CompareGreater => Some(i64::from(left > right)),
     }
     .ok_or_else(|| "arithmetic overflow".to_owned())?;
 

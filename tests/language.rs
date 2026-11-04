@@ -137,7 +137,7 @@ fn phrases_can_cross_lines() {
     assert_eq!(run("이이이야하\n뿌루\n이이이야하\n뿌루루", "8\n").1, "8");
     assert_eq!(
         run(
-            "이이이야하 이야\n야하\n야하 이이이야하 이이이야하 뿌루루 우라\n야하 야하",
+            "이이이야하 이야 야하야하 이이이야하 이이이야하 뿌루루 우라\n야하 야하",
             "1\n9\n"
         )
         .1,
@@ -484,4 +484,87 @@ fn examples_produce_expected_outputs() {
     ] {
         assert_eq!(run(source, input), (Ok(()), expected.to_owned()));
     }
+}
+
+#[test]
+fn comparisons_cover_order_equality_and_i64_extremes() {
+    for (left, right, expected) in [
+        (2, 7, "010"),
+        (7, 2, "100"),
+        (0, 0, "001"),
+        (-7, -2, "010"),
+        (i64::MIN, i64::MAX, "010"),
+        (i64::MAX, i64::MIN, "100"),
+        (i64::MIN, i64::MIN, "001"),
+    ] {
+        let source = "이이이야하 이이이야하 하아 야하 이이이야하 뿌루루 이이이야하 이이이야하 하아 이야 이이이야하 뿌루루 이이이야하 이이이야하 하아 핫 이이이야하 뿌루루";
+        let input = format!("{left}\n{right}\n").repeat(3);
+        assert_eq!(run(source, &input), (Ok(()), expected.to_owned()));
+    }
+}
+
+#[test]
+fn comparison_spellings_and_phrase_boundaries() {
+    let expected = compile("하아 야하 하아 이야 하아 핫");
+    assert_eq!(
+        expected.lines[0],
+        vec![
+            yahalang::parser::Instruction::CompareGreater,
+            yahalang::parser::Instruction::CompareLess,
+            yahalang::parser::Instruction::CompareEqual,
+        ]
+    );
+    for (language, source) in [
+        (Language::Korean, "하아야하 하아\n이야 하아 핫"),
+        (Language::English, "haayaha haa\niya haa hat"),
+        (Language::Japanese, "ハアヤハ ハア\nイヤ ハア ハッ"),
+    ] {
+        assert_eq!(
+            parse(&lex(source, language).unwrap())
+                .unwrap()
+                .lines
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>(),
+            expected.lines.iter().flatten().cloned().collect::<Vec<_>>()
+        );
+    }
+    for source in [
+        "하아",
+        "하아 ; 야하",
+        "하아 뿌루",
+        "하아 우라",
+        "야다 야하",
+        "야다 이야",
+        "야다 핫",
+    ] {
+        assert!(malformed(source), "{source}");
+    }
+}
+
+#[test]
+fn comparisons_check_operands_and_report_the_opening_line() {
+    for operation in ["하아 야하", "하아 이야", "하아 핫"] {
+        for prefix in ["", "하야하 야하", "[] 하야하 야하", "하야하 야하 []"] {
+            let error = run(&format!("{prefix}\n{operation}"), "").0.unwrap_err();
+            assert_eq!(error.line, 2);
+            let expected = if prefix.contains('[') {
+                "expected an integer"
+            } else {
+                "stack underflow"
+            };
+            assert!(error.message.contains(expected));
+        }
+    }
+}
+
+#[test]
+fn comparison_results_feed_conditions_and_preserve_lower_values() {
+    let source = "이이이야하 이이이야하 이이이야하 하아 이야 이야 야하야하 하야하 뿌루 야하 이이이야하 뿌루루 우라 야하야하 이이이야하 뿌루루";
+    assert_eq!(run(source, "9\n2\n7\n"), (Ok(()), "19".to_owned()));
+    assert_eq!(run(source, "9\n7\n2\n"), (Ok(()), "9".to_owned()));
+    assert_eq!(
+        run(include_str!("../examples/compare.yaha"), "2\n7\n"),
+        (Ok(()), "1".to_owned())
+    );
 }

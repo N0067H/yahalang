@@ -3,6 +3,7 @@ use crate::language::Language;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TokenKind {
     Hayaha,
+    Haa,
     Ura,
     Yaha,
     Ppuru,
@@ -30,6 +31,7 @@ pub enum TokenKind {
 impl TokenKind {
     pub const fn spelling(self, language: Language) -> Option<&'static str> {
         let spellings = match self {
+            Self::Haa => ["haa", "하아", "ハア"],
             Self::Hayaha => ["hayaha", "하야하", "ハヤハ"],
             Self::Ura => ["ura", "우라", "ウラ"],
             Self::Yaha => ["yaha", "야하", "ヤハ"],

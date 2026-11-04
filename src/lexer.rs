@@ -3,6 +3,7 @@ use crate::token::{Span, Token, TokenKind};
 
 const UTTERANCES: &[TokenKind] = &[
     TokenKind::Hayaha,
+    TokenKind::Haa,
     TokenKind::Ura,
     TokenKind::Yaha,
     TokenKind::Ppuru,

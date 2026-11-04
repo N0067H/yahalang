@@ -17,6 +17,9 @@ pub enum Instruction {
     Divide,
     Remainder,
     Negate,
+    CompareEqual,
+    CompareLess,
+    CompareGreater,
     Duplicate,
     Discard,
     Swap,
@@ -165,7 +168,6 @@ impl Parser {
         }
 
         let line = self.line();
-        self.cursor += 1;
         let marker = self.block_marker()?;
         let start = self.instruction_count;
         let instruction = match marker {
@@ -181,8 +183,8 @@ impl Parser {
     }
 
     fn block_marker(&mut self) -> Result<TokenKind, ParseError> {
+        self.expect(TokenKind::Iya)?;
         let marker = self.current().kind;
-
         if !matches!(marker, TokenKind::Yada | TokenKind::Yaha) || !self.phrase(&[marker, marker]) {
             return Err(self.error("expected yada yada or yaha yaha after iya"));
         }
@@ -216,6 +218,7 @@ impl Parser {
             Iya if self.take(Ppuru) => Ok(Instruction::Swap),
             Yat => Ok(Instruction::Halt),
 
+            Haa => self.comparison_instruction(),
             Ura => self.prefixed_instruction(),
             Iiiiyaha => Ok(self.io_instruction()),
 
@@ -226,6 +229,18 @@ impl Parser {
 
             _ => self.invalid_instruction(),
         }
+    }
+
+    fn comparison_instruction(&mut self) -> Result<Instruction, ParseError> {
+        let instruction = match self.current().kind {
+            TokenKind::Yaha => Instruction::CompareGreater,
+            TokenKind::Iya => Instruction::CompareLess,
+            TokenKind::Hat => Instruction::CompareEqual,
+            _ => return Err(self.error("expected yaha, iya, or hat after haa")),
+        };
+        self.cursor += 1;
+
+        Ok(instruction)
     }
 
     fn prefixed_instruction(&mut self) -> Result<Instruction, ParseError> {
