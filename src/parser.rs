@@ -33,6 +33,7 @@ pub enum Instruction {
     Halt,
     ReadInteger,
     ReadCharacter,
+    ReadString,
     PrintInteger,
     PrintCharacter,
     PrintCharacterArray,
@@ -261,7 +262,7 @@ impl Parser {
             Yat => Ok(Instruction::Halt),
 
             Yada => self.array_instruction(),
-            Urara => self.character_input(),
+            Urara => self.input_instruction(),
             Haa => self.comparison_instruction(),
             Ura => self.prefixed_instruction(),
             Iiiiyaha => Ok(self.io_instruction()),
@@ -295,9 +296,14 @@ impl Parser {
         Ok(instruction)
     }
 
-    fn character_input(&mut self) -> Result<Instruction, ParseError> {
-        self.expect(TokenKind::Iiiiyaha)?;
-        Ok(Instruction::ReadCharacter)
+    fn input_instruction(&mut self) -> Result<Instruction, ParseError> {
+        let instruction = match self.current().kind {
+            TokenKind::Iiiiyaha => Instruction::ReadCharacter,
+            TokenKind::Yada => Instruction::ReadString,
+            _ => return Err(self.incomplete_error("expected iiiiyaha or yada after urara")),
+        };
+        self.cursor += 1;
+        Ok(instruction)
     }
 
     fn comparison_instruction(&mut self) -> Result<Instruction, ParseError> {

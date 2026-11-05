@@ -236,3 +236,23 @@ printf 'Hello, 안녕!\n' | yahalang run examples/print_character_array.yaha --l
 The example collects characters until EOF before printing the entire array. Input whitespace, newlines, and NUL are preserved. EOF's -1 must not be stored as a character.
 
 Every element is validated before output begins. Invalid Unicode values, wrong types, or stack underflow produce no output and leave the stack unchanged. An output device failure also leaves the array reference on the stack, but bytes already written cannot be rolled back. The phrase may cross a newline but cannot contain `;`.
+
+## String input
+
+`urara yada` (`우라라 야다` / `ウララ ヤダ`) reads one UTF-8 line into a new, independent array of Unicode code points. It removes the terminating LF or CRLF while preserving spaces, tabs, NUL, and a standalone CR. An empty line produces an empty array. A final nonempty line without a newline is accepted; EOF with no data is a runtime error, unlike character input's -1.
+
+```text
+urara yada
+yada iiiiyaha
+```
+
+Input `Hello` followed by Enter produces `Hello`, without an automatic output newline.
+
+```sh
+printf '가나다\n' | yahalang run examples/string_echo.yaha --lang ko
+printf '가나🦀\n' | yahalang run examples/string_length.yaha --lang ko
+```
+
+The examples output `가나다` and `3`, respectively. Length counts Unicode scalar values, not grapheme clusters.
+
+Invalid UTF-8, I/O errors, and lines larger than 1 MiB excluding LF/CRLF report runtime errors without pushing a value. Consumed input is not rolled back. The REPL shares the same input stream; this command consumes only the next line. Phrases may cross newlines but cannot contain `;`.

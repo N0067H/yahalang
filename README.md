@@ -75,6 +75,7 @@ REPL은 입력 사이에 스택과 배열을 유지합니다. 블록이나 숫�
 | `이야 뿌루` | `iya ppuru` | `イヤ プル` | 맨 위 두 값 교환 |
 | `이이이야하` | `iiiiyaha` | `イイイヤハ` | 정수 입력 |
 | `우라라 이이이야하` | `urara iiiiyaha` | `ウララ イイイヤハ` | 문자 입력, EOF는 -1 |
+| `우라라 야다` | `urara yada` | `ウララ ヤダ` | 한 줄을 코드 포인트 배열로 입력 |
 | `이이이야하 뿌루루` | `iiiiyaha ppururu` | `イイイヤハ プルル` | 정수 출력 |
 | `이이이야하 우라라` | `iiiiyaha urara` | `イイイヤハ ウララ` | 유니코드 문자 출력 |
 | `야다 이이이야하` | `yada iiiiyaha` | `ヤダ イイイヤハ` | 정수 배열을 문자들로 출력 |
@@ -210,6 +211,42 @@ printf '안녕!\n' | cargo run -- run examples/character_echo.yaha --lang ko
 문자 입력은 다음 문자나 줄바꿈을 미리 소비하지 않습니다. 터미널에서는 문자를 입력한 뒤
 Enter를 눌러야 전달될 수 있고, 그 줄바꿈은 다음 입력에 남습니다. REPL도 같은 입력 스트림을
 사용하므로 남은 문자는 이후 프로그램 입력이나 REPL 소스로 읽힙니다.
+
+## 문자열 입력
+
+`우라라 야다`는 UTF-8 한 줄을 읽어 코드 포인트 배열을 스택에 넣습니다.
+문자 하나를 읽는 `우라라 이이이야하`와 달리 줄 끝까지 읽으며 LF 또는 CRLF는 배열에 넣지 않습니다.
+앞뒤 공백, 탭, NUL은 보존하고 마지막에 홀로 있는 CR도 보존합니다.
+
+```text
+우라라 야다
+야다 이이이야하
+```
+
+`가나다`를 입력하고 Enter를 누르면 `가나다`가 출력됩니다. 출력 명령은 줄바꿈을 붙이지 않습니다.
+빈 줄은 빈 배열이 되며, 줄바꿈 없이 EOF로 끝난 마지막 내용도 한 줄로 읽습니다.
+읽을 내용 없이 EOF를 만나면 정수 입력처럼 실행 오류입니다. 문자 입력의 EOF 값 -1과 다릅니다.
+
+```sh
+printf '가나다\n' | cargo run -- run examples/string_echo.yaha --lang ko
+```
+
+출력: `가나다`.
+
+```text
+우라라 야다
+야다 뿌루루
+이이이야하 뿌루루
+```
+
+위 코드는 입력한 줄의 유니코드 코드 포인트 수를 출력합니다. `가나🦀`는 `3`입니다.
+조합된 이모지나 결합 문자는 화면에 보이는 한 글자가 여러 원소일 수 있습니다.
+[string_length.yaha](examples/string_length.yaha)로 실행할 수 있습니다.
+
+매 입력은 독립된 배열을 만듭니다. 잘못된 UTF-8과 줄 끝을 제외한 1 MiB 초과 입력은 오류이며
+새 값을 스택에 넣지 않습니다. 이미 읽은 입력은 되돌리지 않습니다.
+REPL에서도 소스 입력과 같은 스트림을 쓰며, 문자열 입력은 그 다음 한 줄과 줄 끝만 소비합니다.
+두 소리는 줄바꿈으로 나눌 수 있지만 사이에 `;`는 넣을 수 없습니다.
 
 ## 배열
 
@@ -379,6 +416,8 @@ cargo run -- repl --lang ko --error-style friendly
 | [hello_world.yaha](examples/hello_world.yaha) | `Hello, world!`와 줄바꿈 출력 |
 | [add_two_numbers.yaha](examples/add_two_numbers.yaha) | 정수 두 개의 합 출력 |
 | [character_echo.yaha](examples/character_echo.yaha) | EOF까지 입력 문자 그대로 출력 |
+| [string_echo.yaha](examples/string_echo.yaha) | 한 줄을 배열로 읽어 출력 |
+| [string_length.yaha](examples/string_length.yaha) | 한 줄의 코드 포인트 수 출력 |
 | [integer_echo.yaha](examples/integer_echo.yaha) | 입력 정수 출력 |
 | [print_character_array.yaha](examples/print_character_array.yaha) | EOF까지 문자를 모아 배열 전체 출력 |
 | [array_copy.yaha](examples/array_copy.yaha) | 복사본과 원본 길이를 출력해 `21` 확인 |

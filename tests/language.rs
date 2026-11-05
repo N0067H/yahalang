@@ -1068,3 +1068,103 @@ fn character_array_output_keeps_array_on_write_or_flush_failure() {
         assert_eq!(state.stack_display(), "[[65]]");
     }
 }
+
+#[test]
+fn string_input_spellings_and_phrase_boundaries() {
+    let expected = compile("우라라 야다");
+    assert_eq!(
+        expected.lines[0],
+        vec![yahalang::parser::Instruction::ReadString]
+    );
+    for (language, source) in [
+        (Language::Korean, "우라라야다"),
+        (Language::English, "urarayada"),
+        (Language::Japanese, "ウララヤダ"),
+    ] {
+        assert_eq!(parse(&lex(source, language).unwrap()).unwrap(), expected);
+    }
+    assert!(malformed("우라라 ; 야다"));
+    assert_eq!(
+        run("우라라\n야다 야다 이이이야하", "가\n"),
+        (Ok(()), "가".to_owned())
+    );
+}
+
+#[test]
+fn string_input_preserves_content_and_removes_only_lf_or_crlf() {
+    let source = include_str!("../examples/string_echo.yaha");
+    for (input, expected) in [
+        ("가나🦀\n", "가나🦀"),
+        ("  a\t \r\n", "  a\t "),
+        ("\n", ""),
+        ("\r\n", ""),
+        ("a\0b\n", "a\0b"),
+        ("tail", "tail"),
+        ("tail\r", "tail\r"),
+        ("a\rb\n", "a\rb"),
+    ] {
+        assert_eq!(run(source, input), (Ok(()), expected.to_owned()));
+    }
+    assert_eq!(
+        run(include_str!("../examples/string_length.yaha"), "가나🦀\n"),
+        (Ok(()), "3".to_owned())
+    );
+    assert_eq!(
+        run(
+            "우라라 야다 야다 이이이야하 우라라 이이이야하 이이이야하 우라라",
+            "abc\nZ"
+        ),
+        (Ok(()), "abcZ".to_owned())
+    );
+}
+
+#[test]
+fn string_input_returns_independent_arrays_and_preserves_state_on_eof() {
+    use yahalang::executor::ExecutionState;
+    let mut state = ExecutionState::default();
+    let source = compile("우라라 야다 우라라 야다 하야하 뿌루 야하 야다 뿌루");
+    state
+        .execute(&source, &mut Cursor::new(b"A\nA\n"), &mut Vec::new())
+        .unwrap();
+    assert_eq!(state.stack_display(), "[[65], [65, 1]]");
+    let before = state.stack_display();
+    let error = state
+        .execute(
+            &compile("\n우라라 야다"),
+            &mut Cursor::new(b""),
+            &mut Vec::new(),
+        )
+        .unwrap_err();
+    assert_eq!(error.line, 2);
+    assert_eq!(error.message, "string input reached EOF");
+    assert_eq!(state.stack_display(), before);
+}
+
+#[test]
+fn string_input_checks_utf8_and_byte_limit() {
+    let program = compile("우라라 야다");
+    for bytes in [&b"\xff\n"[..], &b"\xe3\x81"[..]] {
+        let mut input = std::io::BufReader::with_capacity(1, Cursor::new(bytes));
+        assert!(
+            execute(&program, &mut input, &mut Vec::new())
+                .unwrap_err()
+                .message
+                .contains("UTF-8")
+        );
+    }
+    for ending in ["", "\n", "\r\n"] {
+        let input = format!("{}{ending}", "a".repeat(1024 * 1024));
+        assert_eq!(
+            run("우라라 야다 야다 뿌루루 이이이야하 뿌루루", &input),
+            (Ok(()), "1048576".to_owned())
+        );
+    }
+    let oversized = "a".repeat(1024 * 1024 + 1);
+    assert!(
+        run("우라라 야다", &oversized)
+            .0
+            .unwrap_err()
+            .message
+            .contains("too long")
+    );
+}

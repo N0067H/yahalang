@@ -6,6 +6,7 @@ use crate::parser::{Instruction, Program};
 
 type Array = Rc<RefCell<Vec<i64>>>;
 const MAX_INTEGER_INPUT_BYTES: usize = 1024;
+const MAX_STRING_INPUT_BYTES: usize = 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Value {
@@ -201,6 +202,7 @@ fn execute_instruction<R: BufRead, W: Write>(
 
         Instruction::Halt => return Ok(Flow::Halt),
         Instruction::ReadInteger => stack.push(Value::Integer(read_integer(input).map_err(error)?)),
+        Instruction::ReadString => stack.push(Value::Array(read_string(input).map_err(error)?)),
         Instruction::ReadCharacter => {
             stack.push(Value::Integer(read_character(input).map_err(error)?))
         }
@@ -491,4 +493,36 @@ fn read_character<R: BufRead>(input: &mut R) -> Result<i64, String> {
         .expect("one UTF-8 character was decoded");
 
     Ok(i64::from(u32::from(character)))
+}
+
+fn read_string<R: BufRead>(input: &mut R) -> Result<Array, String> {
+    let mut bytes = Vec::new();
+    let length = input
+        .take((MAX_STRING_INPUT_BYTES + 3) as u64)
+        .read_until(b'\n', &mut bytes)
+        .map_err(|error| format!("input failed: {error}"))?;
+    if length == 0 {
+        return Err("string input reached EOF".to_owned());
+    }
+    strip_line_ending(&mut bytes);
+    if bytes.len() > MAX_STRING_INPUT_BYTES {
+        return Err("string input line is too long".to_owned());
+    }
+    let text =
+        std::str::from_utf8(&bytes).map_err(|error| format!("input is not UTF-8: {error}"))?;
+    let values = text
+        .chars()
+        .map(|character| i64::from(u32::from(character)))
+        .collect();
+    Ok(Rc::new(RefCell::new(values)))
+}
+
+fn strip_line_ending(bytes: &mut Vec<u8>) {
+    if bytes.last() != Some(&b'\n') {
+        return;
+    }
+    bytes.pop();
+    if bytes.last() == Some(&b'\r') {
+        bytes.pop();
+    }
 }

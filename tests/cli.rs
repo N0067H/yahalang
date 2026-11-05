@@ -285,3 +285,13 @@ fn repl_prints_character_array_and_preserves_its_duplicate() {
     assert!(output.contains("...> A\n"), "{output}");
     assert!(output.contains("[[65]]"), "{output}");
 }
+
+#[test]
+fn repl_reads_a_string_and_keeps_following_commands() {
+    let (output, errors) =
+        repl_session("우라라\n야다\n가나\n:stack\n야다 이이이야하\n:stack\n:q\n");
+    assert!(errors.is_empty(), "{errors}");
+    assert!(output.contains("[[44032, 45208]]"), "{output}");
+    assert!(output.contains("yaha> 가나\n"), "{output}");
+    assert!(output.ends_with("yaha> []\nyaha> "), "{output}");
+}
