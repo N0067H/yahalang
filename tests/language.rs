@@ -568,3 +568,74 @@ fn comparison_results_feed_conditions_and_preserve_lower_values() {
         (Ok(()), "1".to_owned())
     );
 }
+
+#[test]
+fn character_input_spellings_and_incomplete_phrases() {
+    let expected = compile("우라라 이이이야하");
+    assert_eq!(
+        expected.lines[0],
+        vec![yahalang::parser::Instruction::ReadCharacter]
+    );
+    for (language, source) in [
+        (Language::Korean, "우라라이이이야하"),
+        (Language::English, "uraraiiiiyaha"),
+        (Language::Japanese, "ウラライイイヤハ"),
+    ] {
+        assert_eq!(parse(&lex(source, language).unwrap()).unwrap(), expected);
+    }
+    assert!(
+        parse(&lex("우라라", Language::Korean).unwrap())
+            .unwrap_err()
+            .incomplete
+    );
+    assert!(malformed("우라라 ; 이이이야하"));
+    assert!(malformed("우라라 뿌루"));
+    let (result, output) = run("우라라\n이이이야하 이이이야하 뿌루루", "가");
+    assert_eq!((result, output), (Ok(()), "44032".to_owned()));
+}
+
+#[test]
+fn character_input_reads_scalars_without_consuming_following_bytes() {
+    for character in ['A', 'é', '가', '🦀', '\0', '\u{10ffff}', '\r', '\n', ' '] {
+        let source = "우라라 이이이야하 이이이야하 뿌루루 우라라 이이이야하 이이이야하 뿌루루";
+        let expected = format!("{}90", u32::from(character));
+        assert_eq!(run(source, &format!("{character}Z")), (Ok(()), expected));
+    }
+    assert_eq!(
+        run("우라라 이이이야하 이이이야하 뿌루루", ""),
+        (Ok(()), "-1".to_owned())
+    );
+    assert_eq!(
+        run("우라라 이이이야하 이이이야하 이이이야하 뿌루루", "A42\n"),
+        (Ok(()), "42".to_owned())
+    );
+}
+
+#[test]
+fn character_input_rejects_invalid_and_truncated_utf8() {
+    let program = compile("\n우라라 이이이야하");
+    for bytes in [
+        &b"\xff"[..],
+        &b"\x80"[..],
+        &b"\xc0\x80"[..],
+        &b"\xe0\x80\x80"[..],
+        &b"\xed\xa0\x80"[..],
+        &b"\xf4\x90\x80\x80"[..],
+        &b"\xe3\x81"[..],
+    ] {
+        let mut input = std::io::BufReader::with_capacity(1, Cursor::new(bytes));
+        let error = execute(&program, &mut input, &mut Vec::new()).unwrap_err();
+        assert_eq!(error.line, 2);
+        assert!(error.message.contains("UTF-8"), "{error:?}");
+    }
+    let mut input = std::io::BufReader::with_capacity(1, Cursor::new("가".as_bytes()));
+    execute(&program, &mut input, &mut Vec::new()).unwrap();
+}
+
+#[test]
+fn character_echo_handles_unicode_nul_and_eof() {
+    let source = include_str!("../examples/character_echo.yaha");
+    for input in ["", "Hello, world!\n", "한글 🦀\r\n", "\0a"] {
+        assert_eq!(run(source, input), (Ok(()), input.to_owned()));
+    }
+}

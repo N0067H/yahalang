@@ -40,6 +40,7 @@ No `ppuru` means 0 and two of them make 2, regardless of any spaces or line brea
 | `ppuru` / `ura ppuru` | `뿌루` / `우라 뿌루` | `プル` / `ウラ プル` | Duplicate / discard |
 | `iya ppuru` | `이야 뿌루` | `イヤ プル` | Swap the top two values |
 | `iiiiyaha` | `이이이야하` | `イイイヤハ` | Read an integer |
+| `urara iiiiyaha` | `우라라 이이이야하` | `ウララ イイイヤハ` | Read a Unicode character; -1 at EOF |
 | `iiiiyaha ppururu` | `이이이야하 뿌루루` | `イイイヤハ プルル` | Print an integer |
 | `iiiiyaha urara` | `이이이야하 우라라` | `イイイヤハ ウララ` | Print a Unicode character |
 | `yat` | `얏` | `ヤッ` | Halt |
@@ -123,3 +124,11 @@ cargo test --release
 GitHub Actions runs the format check and release tests, then builds for Linux x86-64, Windows x86-64 and macOS Apple Silicon.\
 To publish a release with the archives and `SHA256SUMS` attached, update the version in Cargo.toml and Cargo.lock, then push a matching tag such as `v1.0.0`.\
 Prerelease tags make prereleases, while manual runs just build the files.
+
+## Character input
+
+`urara iiiiyaha` reads one UTF-8 Unicode scalar and pushes its code point, including whitespace and NUL. EOF pushes -1; invalid or truncated UTF-8 is a runtime error. `iiiiyaha urara` prints a character, so its word order is reversed.
+
+Run `yahalang run examples/character_echo.yaha --lang ko` to echo input until EOF. The example adds 1 to each code point when checking the loop condition, allowing NUL while stopping at -1.
+
+Character input shares the integer input and REPL stream. It consumes no following characters or line endings. Terminals may require Enter to deliver input; that newline remains available for the next read.

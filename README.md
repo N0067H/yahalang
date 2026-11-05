@@ -74,13 +74,14 @@ REPL은 입력 사이에 스택과 배열을 유지합니다. 블록이나 숫�
 | `뿌루` / `우라 뿌루` | `ppuru` / `ura ppuru` | `プル` / `ウラ プル` | 복제 / 버리기 |
 | `이야 뿌루` | `iya ppuru` | `イヤ プル` | 맨 위 두 값 교환 |
 | `이이이야하` | `iiiiyaha` | `イイイヤハ` | 정수 입력 |
+| `우라라 이이이야하` | `urara iiiiyaha` | `ウララ イイイヤハ` | 문자 입력, EOF는 -1 |
 | `이이이야하 뿌루루` | `iiiiyaha ppururu` | `イイイヤハ プルル` | 정수 출력 |
 | `이이이야하 우라라` | `iiiiyaha urara` | `イイイヤハ ウララ` | 유니코드 문자 출력 |
 | `얏` | `yat` | `ヤッ` | 프로그램 종료 |
 
 사칙연산은 스택 맨 위의 정수 두 개를 꺼내 계산합니다. 아래에 있던 값이 왼쪽 피연산자입니다. 7을 넣고 2를 넣은 뒤 뺄셈을 실행하면 5가 남습니다.\
 나눗셈은 소수점 아래를 버립니다. 예를 들어 -7을 2로 나누면 -3입니다.\
-입력 명령은 한 줄에 정수 하나를 읽습니다. 출력 명령은 스택에서 값을 꺼내 출력하며, 줄바꿈을 붙이지 않습니다.
+정수 입력 명령은 한 줄에 정수 하나를 읽습니다. 출력 명령은 스택에서 값을 꺼내 출력하며, 줄바꿈을 붙이지 않습니다.
 
 소리는 `이야`, `우라`처럼 씁니다. 대시를 넣거나 정해지지 않은 소리를 쓰면 오류가 납니다.\
 `야하야하`, `뿌루뿌루`, `핫핫핫`처럼 붙여 써도 됩니다. 소리가 겹치면 긴 쪽을 먼저 읽습니다.\
@@ -157,6 +158,29 @@ printf '12\n30\n' | cargo run -- run examples/add_two_numbers.yaha --lang ko
 
 숫자마다 줄을 나눠 입력하면 `42`가 나오지만, `12 30`을 한 줄에 넣으면 오류가 납니다.
 
+## 문자 입력
+
+`우라라 이이이야하`는 UTF-8 유니코드 문자 하나를 읽어 코드 포인트를 스택에 넣습니다.
+문자 출력인 `이이이야하 우라라`와 순서가 반대입니다. 공백과 줄바꿈도 문자로 읽으며,
+입력 끝(EOF)에서는 -1을 넣습니다. 잘못되거나 중간에 끊긴 UTF-8은 실행 오류입니다.
+
+```text
+우라라 이이이야하
+이이이야하 우라라
+```
+
+위 코드는 입력 문자 하나를 그대로 출력합니다. EOF의 -1은 문자 출력에 쓸 수 없으므로
+반복 입력 시 먼저 검사해야 합니다. [character_echo.yaha](examples/character_echo.yaha)는
+읽은 값에 1을 더한 결과로 반복 여부를 검사해, 코드 포인트 0도 출력하고 EOF에서 멈춥니다.
+
+```sh
+printf '안녕!\n' | cargo run -- run examples/character_echo.yaha --lang ko
+```
+
+문자 입력은 다음 문자나 줄바꿈을 미리 소비하지 않습니다. 터미널에서는 문자를 입력한 뒤
+Enter를 눌러야 전달될 수 있고, 그 줄바꿈은 다음 입력에 남습니다. REPL도 같은 입력 스트림을
+사용하므로 남은 문자는 이후 프로그램 입력이나 REPL 소스로 읽힙니다.
+
 ## 배열
 
 ```text
@@ -207,6 +231,7 @@ cargo run -- repl --lang ko --error-style friendly
 | --- | --- |
 | [hello_world.yaha](examples/hello_world.yaha) | `Hello, world!`와 줄바꿈 출력 |
 | [add_two_numbers.yaha](examples/add_two_numbers.yaha) | 정수 두 개의 합 출력 |
+| [character_echo.yaha](examples/character_echo.yaha) | EOF까지 입력 문자 그대로 출력 |
 | [integer_echo.yaha](examples/integer_echo.yaha) | 입력 정수 출력 |
 | [array_access.yaha](examples/array_access.yaha) | 배열 수정과 조회 |
 | [compare.yaha](examples/compare.yaha) | 첫 번째 입력이 두 번째보다 작으면 `1` 출력 |

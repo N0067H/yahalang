@@ -31,6 +31,7 @@ pub enum Instruction {
     IfStart(usize),
     Halt,
     ReadInteger,
+    ReadCharacter,
     PrintInteger,
     PrintCharacter,
     ArrayLiteral(Vec<i64>),
@@ -226,6 +227,7 @@ impl Parser {
             Iya if self.take(Ppuru) => Ok(Instruction::Swap),
             Yat => Ok(Instruction::Halt),
 
+            Urara => self.character_input(),
             Haa => self.comparison_instruction(),
             Ura => self.prefixed_instruction(),
             Iiiiyaha => Ok(self.io_instruction()),
@@ -237,6 +239,11 @@ impl Parser {
 
             _ => self.invalid_instruction(),
         }
+    }
+
+    fn character_input(&mut self) -> Result<Instruction, ParseError> {
+        self.expect(TokenKind::Iiiiyaha)?;
+        Ok(Instruction::ReadCharacter)
     }
 
     fn comparison_instruction(&mut self) -> Result<Instruction, ParseError> {

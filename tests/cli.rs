@@ -229,3 +229,10 @@ fn repl_reports_incomplete_source_at_eof_and_reads_program_input() {
     assert!(errors.is_empty(), "{errors}");
     assert_eq!(output.matches("[42]").count(), 2, "{output}");
 }
+
+#[test]
+fn repl_reads_character_input_and_preserves_remaining_input() {
+    let (output, errors) = repl_session("우라라\n이이이야하\n가\n:stack\n:q\n");
+    assert!(errors.is_empty(), "{errors}");
+    assert!(output.contains("[44032]"), "{output}");
+}

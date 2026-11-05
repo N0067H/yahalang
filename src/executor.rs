@@ -199,6 +199,9 @@ fn execute_instruction<R: BufRead, W: Write>(
 
         Instruction::Halt => return Ok(Flow::Halt),
         Instruction::ReadInteger => stack.push(Value::Integer(read_integer(input).map_err(error)?)),
+        Instruction::ReadCharacter => {
+            stack.push(Value::Integer(read_character(input).map_err(error)?))
+        }
         Instruction::PrintInteger => {
             let value = pop_integer(stack).map_err(error)?;
             write!(output, "{value}").map_err(|err| error(format!("output failed: {err}")))?;
@@ -384,4 +387,32 @@ fn read_integer<R: BufRead>(input: &mut R) -> Result<i64, String> {
     value
         .parse::<i64>()
         .map_err(|err| format!("invalid integer input: {err}"))
+}
+
+fn read_character<R: BufRead>(input: &mut R) -> Result<i64, String> {
+    let mut bytes = [0_u8; 4];
+    match input.read_exact(&mut bytes[..1]) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(-1),
+        Err(error) => return Err(format!("input failed: {error}")),
+    }
+
+    let length = match bytes[0] {
+        0x00..=0x7f => 1,
+        0xc2..=0xdf => 2,
+        0xe0..=0xef => 3,
+        0xf0..=0xf4 => 4,
+        _ => return Err("input is not UTF-8".to_owned()),
+    };
+    input
+        .read_exact(&mut bytes[1..length])
+        .map_err(|error| format!("input could not read a complete UTF-8 character: {error}"))?;
+    let text = std::str::from_utf8(&bytes[..length])
+        .map_err(|error| format!("input is not UTF-8: {error}"))?;
+    let character = text
+        .chars()
+        .next()
+        .expect("one UTF-8 character was decoded");
+
+    Ok(i64::from(u32::from(character)))
 }
