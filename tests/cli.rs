@@ -236,3 +236,22 @@ fn repl_reads_character_input_and_preserves_remaining_input() {
     assert!(errors.is_empty(), "{errors}");
     assert!(output.contains("[44032]"), "{output}");
 }
+
+#[test]
+fn repl_array_append_and_pop_keep_state_between_submissions() {
+    let (output, errors) = repl_session(
+        "[]\n하야하 뿌루 야하\n야다\n뿌루\n:stack\n야다 우라\n:stack\n이이이야하 뿌루루\n야다 우라\n:stack\n:q\n",
+    );
+    assert!(errors.contains("cannot pop an empty array"), "{errors}");
+    assert!(output.contains("[[1]]"), "{output}");
+    assert!(output.contains("[[], 1]"), "{output}");
+    assert!(output.contains("[[]]"), "{output}");
+}
+
+#[test]
+fn repl_creates_arrays_with_a_spoken_phrase() {
+    let (output, errors) = repl_session("야다\n하야하\n하야하 뿌루 야하\n야다 뿌루\n:stack\n:q\n");
+    assert!(errors.is_empty(), "{errors}");
+    assert!(output.contains("...> "), "{output}");
+    assert!(output.contains("[[1]]"), "{output}");
+}

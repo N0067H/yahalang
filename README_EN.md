@@ -132,3 +132,41 @@ Prerelease tags make prereleases, while manual runs just build the files.
 Run `yahalang run examples/character_echo.yaha --lang ko` to echo input until EOF. The example adds 1 to each code point when checking the loop condition, allowing NUL while stopping at -1.
 
 Character input shares the integer input and REPL stream. It consumes no following characters or line endings. Terminals may require Enter to deliver input; that newline remains available for the next read.
+
+## Growing and shrinking arrays
+
+| Phrase | Stack, bottom to top |
+| --- | --- |
+| `yada hayaha` | push a new empty array |
+| `yada ppuru` | array, integer → array; append the integer |
+| `yada ura` | array → array, integer; remove the last element |
+| `yada ppururu` | array → length |
+| `yada iya` | array, index → element |
+| `yada hat` | array, index, value → consume operands and update element |
+
+`yada hayaha` creates a fresh empty array on each execution and needs no closing `yaha`. Existing array literals remain supported.
+
+Append and pop keep the array reference on the stack and modify the shared array. Empty-array pops, wrong types, and stack underflow report runtime errors without changing the stack or array. Phrases may cross line breaks but cannot contain `;`.
+
+```text
+yada hayaha
+hayaha ppuru yaha
+yada ppuru
+hayaha ppuruppuru yaha
+yada ppuru
+yada ura
+iiiiyaha ppururu
+yada ura
+iiiiyaha ppururu
+```
+
+This appends 1 and 2, then removes and prints them in reverse order: `21`.
+The array remains on the stack after each operation.
+
+```sh
+printf 'abc' | yahalang run examples/reverse_input.yaha --lang ko
+```
+
+Output: `cba`. The example reads until EOF and reverses Unicode scalar values, including any input newline; combining sequences are not kept together.
+
+`yada ppururu`, `yada iya`, and `yada hat` are equivalent to `#`, `@`, and `=`. These operations consume the array reference; duplicate it first to reuse it. Existing symbols remain supported.

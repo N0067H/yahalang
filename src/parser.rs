@@ -38,6 +38,8 @@ pub enum Instruction {
     ArrayGet,
     ArraySet,
     ArrayLength,
+    ArrayAppend,
+    ArrayPop,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -227,6 +229,7 @@ impl Parser {
             Iya if self.take(Ppuru) => Ok(Instruction::Swap),
             Yat => Ok(Instruction::Halt),
 
+            Yada => self.array_instruction(),
             Urara => self.character_input(),
             Haa => self.comparison_instruction(),
             Ura => self.prefixed_instruction(),
@@ -239,6 +242,24 @@ impl Parser {
 
             _ => self.invalid_instruction(),
         }
+    }
+
+    fn array_instruction(&mut self) -> Result<Instruction, ParseError> {
+        let instruction = match self.current().kind {
+            TokenKind::Hayaha => Instruction::ArrayLiteral(Vec::new()),
+            TokenKind::Ppururu => Instruction::ArrayLength,
+            TokenKind::Iya => Instruction::ArrayGet,
+            TokenKind::Hat => Instruction::ArraySet,
+            TokenKind::Ppuru => Instruction::ArrayAppend,
+            TokenKind::Ura => Instruction::ArrayPop,
+            _ => {
+                return Err(self.incomplete_error(
+                    "expected hayaha, ppuru, ppururu, iya, hat, or ura after yada",
+                ));
+            }
+        };
+        self.cursor += 1;
+        Ok(instruction)
     }
 
     fn character_input(&mut self) -> Result<Instruction, ParseError> {

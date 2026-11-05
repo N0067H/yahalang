@@ -529,15 +529,7 @@ fn comparison_spellings_and_phrase_boundaries() {
             expected.lines.iter().flatten().cloned().collect::<Vec<_>>()
         );
     }
-    for source in [
-        "하아",
-        "하아 ; 야하",
-        "하아 뿌루",
-        "하아 우라",
-        "야다 야하",
-        "야다 이야",
-        "야다 핫",
-    ] {
+    for source in ["하아", "하아 ; 야하", "하아 뿌루", "하아 우라", "야다 야하"] {
         assert!(malformed(source), "{source}");
     }
 }
@@ -637,5 +629,161 @@ fn character_echo_handles_unicode_nul_and_eof() {
     let source = include_str!("../examples/character_echo.yaha");
     for input in ["", "Hello, world!\n", "한글 🦀\r\n", "\0a"] {
         assert_eq!(run(source, input), (Ok(()), input.to_owned()));
+    }
+}
+
+#[test]
+fn array_append_and_pop_spellings_and_boundaries() {
+    let expected = compile("야다 뿌루 야다 우라");
+    assert_eq!(
+        expected.lines[0],
+        vec![
+            yahalang::parser::Instruction::ArrayAppend,
+            yahalang::parser::Instruction::ArrayPop,
+        ]
+    );
+    for (language, source) in [
+        (Language::Korean, "야다뿌루 야다우라"),
+        (Language::English, "yadappuru yadaura"),
+        (Language::Japanese, "ヤダプル ヤダウラ"),
+    ] {
+        assert_eq!(parse(&lex(source, language).unwrap()).unwrap(), expected);
+    }
+    for source in ["야다 ; 뿌루", "야다 얏", "야다 야하"] {
+        assert!(malformed(source), "{source}");
+    }
+    assert!(
+        parse(&lex("야다", Language::Korean).unwrap())
+            .unwrap_err()
+            .incomplete
+    );
+    let source = "[] 하야하 뿌루 야하 야다\n뿌루 야다\n우라 이이이야하 뿌루루 # 이이이야하 뿌루루";
+    assert_eq!(run(source, ""), (Ok(()), "10".to_owned()));
+}
+
+#[test]
+fn array_append_and_pop_update_shared_aliases() {
+    let source = "[] 뿌루 하야하 뿌루 야하 야다 뿌루 이야 뿌루 야다 우라 이이이야하 뿌루루 # 이이이야하 뿌루루 # 이이이야하 뿌루루";
+    assert_eq!(run(source, ""), (Ok(()), "100".to_owned()));
+    assert_eq!(
+        run(include_str!("../examples/array_push_pop.yaha"), ""),
+        (Ok(()), "21".to_owned())
+    );
+}
+
+#[test]
+fn array_append_and_pop_preserve_state_on_errors() {
+    use yahalang::executor::ExecutionState;
+    for (setup, operation, expected_stack, message) in [
+        ("", "야다 뿌루", "[]", "stack underflow"),
+        ("[]", "야다 뿌루", "[[]]", "stack underflow"),
+        (
+            "하야하 야하 하야하 뿌루 야하",
+            "야다 뿌루",
+            "[0, 1]",
+            "expected an array",
+        ),
+        ("[] []", "야다 뿌루", "[[], []]", "expected an integer"),
+        ("", "야다 우라", "[]", "stack underflow"),
+        ("하야하 야하", "야다 우라", "[0]", "expected an array"),
+        ("[] 뿌루", "야다 우라", "[[], []]", "empty array"),
+    ] {
+        let mut state = ExecutionState::default();
+        state
+            .execute(&compile(setup), &mut Cursor::new(b""), &mut Vec::new())
+            .unwrap();
+        let error = state
+            .execute(
+                &compile(&format!("\n{operation}")),
+                &mut Cursor::new(b""),
+                &mut Vec::new(),
+            )
+            .unwrap_err();
+        assert_eq!(error.line, 2);
+        assert!(error.message.contains(message), "{error:?}");
+        assert_eq!(state.stack_display(), expected_stack);
+    }
+}
+
+#[test]
+fn reverse_input_handles_empty_unicode_and_nul() {
+    for input in ["", "abc", "가나🦀", "\0a\n"] {
+        let expected: String = input.chars().rev().collect();
+        assert_eq!(
+            run(include_str!("../examples/reverse_input.yaha"), input),
+            (Ok(()), expected)
+        );
+    }
+}
+
+#[test]
+fn spoken_array_creation_spellings_and_boundaries() {
+    let expected = compile("[]");
+    for (language, source) in [
+        (Language::Korean, "야다하야하"),
+        (Language::English, "yadahayaha"),
+        (Language::Japanese, "ヤダハヤハ"),
+    ] {
+        assert_eq!(parse(&lex(source, language).unwrap()).unwrap(), expected);
+    }
+    assert!(malformed("야다 ; 하야하"));
+    assert_eq!(
+        run("야다\n하야하 # 이이이야하 뿌루루", ""),
+        (Ok(()), "0".to_owned())
+    );
+}
+
+#[test]
+fn spoken_array_creation_allocates_independent_arrays_each_time() {
+    use yahalang::executor::ExecutionState;
+    let program = compile("야다 하야하");
+    let mut state = ExecutionState::default();
+    for _ in 0..2 {
+        state
+            .execute(&program, &mut Cursor::new(b""), &mut Vec::new())
+            .unwrap();
+    }
+    state
+        .execute(
+            &compile("하야하 뿌루 야하 야다 뿌루"),
+            &mut Cursor::new(b""),
+            &mut Vec::new(),
+        )
+        .unwrap();
+    assert_eq!(state.stack_display(), "[[], [1]]");
+}
+
+#[test]
+fn spoken_array_access_spellings_match_existing_operations() {
+    let expected = compile("# @ =");
+    for (language, source) in [
+        (Language::Korean, "야다뿌루루 야다이야 야다핫"),
+        (Language::English, "yadappururu yadaiya yadahat"),
+        (Language::Japanese, "ヤダプルル ヤダイヤ ヤダハッ"),
+    ] {
+        assert_eq!(parse(&lex(source, language).unwrap()).unwrap(), expected);
+    }
+    let source = "야다 하야하 하야하 뿌루 야하 야다 뿌루 뿌루 야다 뿌루루 이이이야하 뿌루루 뿌루 하야하 야하 하야하 뿌루뿌루 야하 야다 핫 하야하 야하 야다 이야 이이이야하 뿌루루";
+    assert_eq!(run(source, ""), (Ok(()), "12".to_owned()));
+    for source in ["야다 ; 뿌루루", "야다 ; 이야", "야다 ; 핫"] {
+        assert!(malformed(source), "{source}");
+    }
+}
+
+#[test]
+fn spoken_array_access_preserves_existing_errors() {
+    for (source, expected) in [
+        ("야다 이야", "stack underflow"),
+        ("하야하 야하 야다 뿌루루", "expected an array"),
+        ("야다 하야하 하야하 야하 야다 이야", "out of bounds"),
+        (
+            "야다 하야하 하야하 야하 하야하 뿌루 야하 야다 핫",
+            "out of bounds",
+        ),
+    ] {
+        assert!(
+            run(source, "").0.unwrap_err().message.contains(expected),
+            "{source}"
+        );
     }
 }

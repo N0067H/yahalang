@@ -250,6 +250,8 @@ fn execute_instruction<R: BufRead, W: Write>(
 
             *element = value;
         }
+        Instruction::ArrayAppend => array_append(stack).map_err(error)?,
+        Instruction::ArrayPop => array_pop(stack).map_err(error)?,
         Instruction::ArrayLength => {
             let array = pop_array(stack).map_err(error)?;
             let length = array.borrow().len();
@@ -258,6 +260,33 @@ fn execute_instruction<R: BufRead, W: Write>(
     }
 
     Ok(Flow::Continue)
+}
+
+fn array_append(stack: &mut Vec<Value>) -> Result<(), String> {
+    let length = stack.len();
+    if length < 2 {
+        return Err("stack underflow".to_owned());
+    }
+    let value = stack[length - 1].as_integer()?;
+    let array = stack[length - 2].as_array()?;
+
+    array.borrow_mut().push(value);
+    stack.pop();
+    Ok(())
+}
+
+fn array_pop(stack: &mut Vec<Value>) -> Result<(), String> {
+    let array = stack
+        .last()
+        .ok_or_else(|| "stack underflow".to_owned())?
+        .as_array()?;
+    let value = array
+        .borrow_mut()
+        .pop()
+        .ok_or_else(|| "cannot pop an empty array".to_owned())?;
+
+    stack.push(Value::Integer(value));
+    Ok(())
 }
 
 fn conditional_flow(condition: i64, target: usize) -> Flow {
@@ -289,6 +318,13 @@ fn pop_array(stack: &mut Vec<Value>) -> Result<Array, String> {
 }
 
 impl Value {
+    fn as_array(&self) -> Result<Array, String> {
+        match self {
+            Self::Array(array) => Ok(Rc::clone(array)),
+            Self::Integer(_) => Err("expected an array but found an integer".to_owned()),
+        }
+    }
+
     fn as_integer(&self) -> Result<i64, String> {
         match self {
             Self::Integer(value) => Ok(*value),
