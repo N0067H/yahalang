@@ -43,6 +43,7 @@ No `ppuru` means 0 and two of them make 2, regardless of any spaces or line brea
 | `urara iiiiyaha` | `우라라 이이이야하` | `ウララ イイイヤハ` | Read a Unicode character; -1 at EOF |
 | `iiiiyaha ppururu` | `이이이야하 뿌루루` | `イイイヤハ プルル` | Print an integer |
 | `iiiiyaha urara` | `이이이야하 우라라` | `イイイヤハ ウララ` | Print a Unicode character |
+| `ura iya` | `우라 이야` | `ウラ イヤ` | Break out of the nearest loop |
 | `yat` | `얏` | `ヤッ` | Halt |
 
 Math commands take the top two integers off the stack with the lower one on the left, so pushing 7, then 2, then subtracting gives 5.\
@@ -170,3 +171,23 @@ printf 'abc' | yahalang run examples/reverse_input.yaha --lang ko
 Output: `cba`. The example reads until EOF and reverses Unicode scalar values, including any input newline; combining sequences are not kept together.
 
 `yada ppururu`, `yada iya`, and `yada hat` are equivalent to `#`, `@`, and `=`. These operations consume the array reference; duplicate it first to reuse it. Existing symbols remain supported.
+
+## Breaking out of a loop
+
+`ura iya` exits the nearest enclosing loop, including from inside a conditional. Nested loops exit only the innermost loop. The stack is unchanged, and execution continues after the loop. Unlike `yat`, it does not end the program. Use outside a loop is a parse error, even in unreachable code. The phrase may cross a newline but cannot contain `;`.
+
+```text
+hayaha ppuruppuruppuru yaha
+iya yadayada
+    ura iya
+ura yadayada
+iiiiyaha ppururu
+```
+
+Output: `3`. The loop exits even though the condition remains nonzero.
+
+```sh
+printf '3\n2\n0\n' | yahalang run examples/break_on_zero.yaha --lang ko
+```
+
+Output: `32`. This example reads integers until 0, then breaks from inside a conditional. EOF before 0 is an integer input error.

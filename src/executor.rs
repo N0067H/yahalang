@@ -191,7 +191,9 @@ fn execute_instruction<R: BufRead, W: Write>(
             let condition = peek_integer(stack).map_err(error)?;
             return Ok(conditional_flow(condition, *target));
         }
-        Instruction::WhileEnd(target) => return Ok(Flow::Jump(*target)),
+        Instruction::WhileEnd(target) | Instruction::Break(target) => {
+            return Ok(Flow::Jump(*target));
+        }
         Instruction::IfStart(target) => {
             let condition = pop_integer(stack).map_err(error)?;
             return Ok(conditional_flow(condition, *target));

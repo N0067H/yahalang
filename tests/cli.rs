@@ -255,3 +255,15 @@ fn repl_creates_arrays_with_a_spoken_phrase() {
     assert!(output.contains("...> "), "{output}");
     assert!(output.contains("[[1]]"), "{output}");
 }
+
+#[test]
+fn repl_accepts_split_loop_break_and_continues_after_errors() {
+    let (output, errors) = repl_session(
+        "우라 이야\n하야하 뿌루 야하\n이야 야다야다\n우라\n이야\n우라 야다야다\n:stack\n:q\n",
+    );
+    assert!(
+        errors.contains("loop break is only valid inside a loop"),
+        "{errors}"
+    );
+    assert!(output.contains("[1]"), "{output}");
+}

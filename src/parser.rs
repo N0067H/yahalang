@@ -27,6 +27,7 @@ pub enum Instruction {
     WhileStart(usize),
     /// Flat instruction offset of the matching loop start.
     WhileEnd(usize),
+    Break(usize),
     /// Flat instruction offset after the conditional body.
     IfStart(usize),
     Halt,
@@ -88,6 +89,7 @@ pub fn parse(tokens: &[Token]) -> Result<Program, ParseError> {
         cursor: 0,
         lines: vec![Vec::new(); line + 1],
         instruction_count: 0,
+        loop_breaks: Vec::new(),
     };
     parser.sequence(None, 0)?;
     Ok(Program {
@@ -100,6 +102,7 @@ struct Parser {
     cursor: usize,
     lines: Vec<Vec<Instruction>>,
     instruction_count: usize,
+    loop_breaks: Vec<Vec<(usize, usize)>>,
 }
 
 impl Parser {
@@ -128,6 +131,11 @@ impl Parser {
 
         if let Some(marker) = self.block_end() {
             return self.close_block(closing, marker);
+        }
+
+        if self.phrase(&[TokenKind::Ura, TokenKind::Iya]) {
+            self.break_loop()?;
+            return Ok(false);
         }
 
         if self.at(TokenKind::Iya) && !self.phrase(&[TokenKind::Iya, TokenKind::Ppuru]) {
@@ -181,6 +189,9 @@ impl Parser {
         };
         let slot = self.emit(line, instruction);
 
+        if marker == TokenKind::Yada {
+            self.loop_breaks.push(Vec::new());
+        }
         self.sequence(Some(marker), depth + 1)?;
         self.finish_block(marker, line, slot, start);
 
@@ -213,6 +224,24 @@ impl Parser {
         let end_line = self.tokens[self.cursor - 3].1;
         self.emit(end_line, Instruction::WhileEnd(start));
         self.lines[line][slot] = Instruction::WhileStart(self.instruction_count);
+        let breaks = self.loop_breaks.pop().expect("loop context exists");
+        for (line, slot) in breaks {
+            self.lines[line][slot] = Instruction::Break(self.instruction_count);
+        }
+    }
+
+    fn break_loop(&mut self) -> Result<(), ParseError> {
+        if self.loop_breaks.is_empty() {
+            return Err(self.error("loop break is only valid inside a loop"));
+        }
+        let line = self.line();
+        self.cursor += 2;
+        let slot = self.emit(line, Instruction::Break(0));
+        self.loop_breaks
+            .last_mut()
+            .expect("loop context exists")
+            .push((line, slot));
+        Ok(())
     }
 
     fn instruction(&mut self) -> Result<Instruction, ParseError> {

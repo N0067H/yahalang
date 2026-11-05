@@ -77,6 +77,7 @@ REPL은 입력 사이에 스택과 배열을 유지합니다. 블록이나 숫�
 | `우라라 이이이야하` | `urara iiiiyaha` | `ウララ イイイヤハ` | 문자 입력, EOF는 -1 |
 | `이이이야하 뿌루루` | `iiiiyaha ppururu` | `イイイヤハ プルル` | 정수 출력 |
 | `이이이야하 우라라` | `iiiiyaha urara` | `イイイヤハ ウララ` | 유니코드 문자 출력 |
+| `우라 이야` | `ura iya` | `ウラ イヤ` | 가장 가까운 반복문 탈출 |
 | `얏` | `yat` | `ヤッ` | 프로그램 종료 |
 
 사칙연산은 스택 맨 위의 정수 두 개를 꺼내 계산합니다. 아래에 있던 값이 왼쪽 피연산자입니다. 7을 넣고 2를 넣은 뒤 뺄셈을 실행하면 5가 남습니다.\
@@ -119,6 +120,34 @@ REPL은 입력 사이에 스택과 배열을 유지합니다. 블록이나 숫�
 ```
 
 실행하면 `321`이 나오고, 빈 줄과 들여쓰기는 자유롭게 넣어도 됩니다.
+
+### 반복 중간에서 탈출하기
+
+`우라 이야`는 가장 가까운 반복문 하나를 끝내고 닫는 구절 다음으로 이동합니다.
+조건 블록 안에서도 쓸 수 있고 중첩 반복에서는 안쪽 반복만 끝냅니다.
+스택의 값은 그대로 두므로 탈출 전에 다음 반복 검사에 쓸 정수를 남길 필요는 없습니다.
+반복문 밖에서 쓰면 실행 전에 구문 오류가 나며, 탈출 뒤의 코드도 문법 검사를 받습니다.
+`우라`와 `이야`는 줄바꿈으로 나눌 수 있지만 사이에 `;`는 넣을 수 없습니다.
+
+```text
+하야하 뿌루뿌루뿌루 야하
+이야 야다야다
+    우라 이야
+우라 야다야다
+이이이야하 뿌루루
+```
+
+조건값 3이 남아 있지만 `우라 이야`가 반복을 끝냅니다. 반복 뒤의 출력은 계속 실행되므로
+결과는 `3`입니다. 프로그램 전체를 끝내는 `얏`과 동작이 다릅니다.
+
+[break_on_zero.yaha](examples/break_on_zero.yaha)는 정수를 계속 읽어 출력하다가 0을 만나면
+조건 블록 안의 `우라 이야`로 반복을 끝냅니다. 0은 출력하지 않습니다.
+
+```sh
+printf '3\n2\n0\n' | cargo run -- run examples/break_on_zero.yaha --lang ko
+```
+
+출력: `32`. 입력을 끝낼 때는 0을 넣어야 하며, 그 전에 EOF를 만나면 정수 입력 오류가 납니다.
 
 ## 비교
 
@@ -294,6 +323,7 @@ cargo run -- repl --lang ko --error-style friendly
 | [reverse_input.yaha](examples/reverse_input.yaha) | EOF까지 읽은 문자의 순서를 뒤집어 출력 |
 | [array_access.yaha](examples/array_access.yaha) | 배열 수정과 조회 |
 | [compare.yaha](examples/compare.yaha) | 첫 번째 입력이 두 번째보다 작으면 `1` 출력 |
+| [break_on_zero.yaha](examples/break_on_zero.yaha) | 정수를 출력하다 0에서 반복 탈출 |
 | [countdown.yaha](examples/countdown.yaha) | `321` 출력 |
 | [truth_machine.yaha](examples/truth_machine.yaha) | 0은 한 번 출력, 1은 계속 출력 |
 

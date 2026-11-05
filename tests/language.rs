@@ -787,3 +787,61 @@ fn spoken_array_access_preserves_existing_errors() {
         );
     }
 }
+
+#[test]
+fn loop_break_spellings_and_phrase_boundaries() {
+    let expected = compile("이야 야다야다 우라 이야 우라 야다야다");
+    for (language, source) in [
+        (Language::Korean, "이야야다야다 우라이야 우라야다야다"),
+        (Language::English, "iyayadayada uraiya urayadayada"),
+        (Language::Japanese, "イヤヤダヤダ ウライヤ ウラヤダヤダ"),
+    ] {
+        assert_eq!(parse(&lex(source, language).unwrap()).unwrap(), expected);
+    }
+    let source = "하야하 뿌루 야하 이야 야다야다 우라\n이야 우라 야다야다 이이이야하 뿌루루";
+    assert_eq!(run(source, ""), (Ok(()), "1".to_owned()));
+    assert!(malformed("이야 야다야다 우라 ; 이야 우라 야다야다"));
+}
+
+#[test]
+fn loop_break_rejects_use_outside_loops_even_in_unreachable_code() {
+    for source in [
+        "우라 이야",
+        "이야 야하야하 우라 이야 우라 야하야하",
+        "얏 우라 이야",
+        "이야 야다야다 우라 야다야다 우라 이야",
+    ] {
+        let error = parse(&lex(source, Language::Korean).unwrap()).unwrap_err();
+        assert_eq!(error.message, "loop break is only valid inside a loop");
+        assert!(!error.incomplete);
+    }
+}
+
+#[test]
+fn loop_break_preserves_stack_and_skips_remaining_body() {
+    let source = "하야하 뿌루 야하 이야 야다야다 우라 뿌루 우라 이야 야하 우라 야다야다 하야하 뿌루뿌루 야하 이이이야하 뿌루루";
+    assert_eq!(run(source, ""), (Ok(()), "2".to_owned()));
+    let source = "하야하 뿌루 야하 이야 야다야다 우라 뿌루 야다 하야하 우라 이야 야하 우라 야다야다 야다 뿌루루 이이이야하 뿌루루";
+    assert_eq!(run(source, ""), (Ok(()), "0".to_owned()));
+}
+
+#[test]
+fn loop_break_only_exits_the_nearest_loop_inside_conditions() {
+    let source = "하야하 뿌루뿌루 야하 이야 야다야다 하야하 뿌루 야하 이야 야다야다 하야하 뿌루 야하 이야 야하야하 우라 이야 우라 야하야하 야하 우라 야다야다 이이이야하 뿌루루 하야하 뿌루 야하 우라 야하 우라 야다야다 우라 뿌루";
+    assert_eq!(run(source, ""), (Ok(()), "11".to_owned()));
+    assert_eq!(
+        run(include_str!("../examples/break_on_zero.yaha"), "3\n2\n0\n"),
+        (Ok(()), "32".to_owned())
+    );
+}
+
+#[test]
+fn skipped_loop_breaks_and_invalid_targets_are_checked() {
+    let source = "하야하 야하 이야 야다야다 우라 이야 우라 야다야다 이이이야하 뿌루루";
+    assert_eq!(run(source, ""), (Ok(()), "0".to_owned()));
+    let program = Program {
+        lines: vec![vec![yahalang::parser::Instruction::Break(2)]],
+    };
+    let error = execute(&program, &mut Cursor::new(b""), &mut Vec::new()).unwrap_err();
+    assert_eq!(error.message, "invalid instruction target");
+}
