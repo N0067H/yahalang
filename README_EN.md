@@ -141,6 +141,7 @@ Character input shares the integer input and REPL stream. It consumes no followi
 | `yada hayaha` | push a new empty array |
 | `yada ppuru` | array, integer → array; append the integer |
 | `yada ura` | array → array, integer; remove the last element |
+| `yada urara` | array → original array, independent copy |
 | `yada ppururu` | array → length |
 | `yada iya` | array, index → element |
 | `yada hat` | array, index, value → consume operands and update element |
@@ -191,3 +192,24 @@ printf '3\n2\n0\n' | yahalang run examples/break_on_zero.yaha --lang ko
 ```
 
 Output: `32`. This example reads integers until 0, then breaks from inside a conditional. EOF before 0 is an integer input error.
+
+## Independent array copies
+
+`ppuru` duplicates a reference to the same array. `yada urara` copies the contents into a new array, leaving the original below the copy on the stack. Changes to either array do not affect the other; existing references to the original still share it. Empty arrays can be copied. Stack underflow and wrong types report runtime errors without modifying the stack.
+
+```text
+yada hayaha
+hayaha ppuru yaha
+yada ppuru
+yada urara
+hayaha ppuruppuru yaha
+yada ppuru
+```
+
+In the REPL, `:stack` now shows `[[1], [1, 2]]`. Using `ppuru` instead of `yada urara` would show `[[1, 2], [1, 2]]`.
+
+```sh
+yahalang run examples/array_copy.yaha --lang ko
+```
+
+Output: `21`, the length of the modified copy followed by the original length. The phrase may cross a newline but cannot contain `;`.

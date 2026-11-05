@@ -267,3 +267,12 @@ fn repl_accepts_split_loop_break_and_continues_after_errors() {
     );
     assert!(output.contains("[1]"), "{output}");
 }
+
+#[test]
+fn repl_array_copy_stays_independent_between_submissions() {
+    let (output, errors) = repl_session(
+        "야다 하야하\n하야하 뿌루 야하 야다 뿌루\n야다\n우라라\n하야하 뿌루뿌루 야하 야다 뿌루\n:stack\n:q\n",
+    );
+    assert!(errors.is_empty(), "{errors}");
+    assert!(output.contains("[[1], [1, 2]]"), "{output}");
+}

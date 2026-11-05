@@ -254,6 +254,7 @@ fn execute_instruction<R: BufRead, W: Write>(
         }
         Instruction::ArrayAppend => array_append(stack).map_err(error)?,
         Instruction::ArrayPop => array_pop(stack).map_err(error)?,
+        Instruction::ArrayCopy => array_copy(stack).map_err(error)?,
         Instruction::ArrayLength => {
             let array = pop_array(stack).map_err(error)?;
             let length = array.borrow().len();
@@ -262,6 +263,16 @@ fn execute_instruction<R: BufRead, W: Write>(
     }
 
     Ok(Flow::Continue)
+}
+
+fn array_copy(stack: &mut Vec<Value>) -> Result<(), String> {
+    let array = stack
+        .last()
+        .ok_or_else(|| "stack underflow".to_owned())?
+        .as_array()?;
+    let values = array.borrow().clone();
+    stack.push(Value::Array(Rc::new(RefCell::new(values))));
+    Ok(())
 }
 
 fn array_append(stack: &mut Vec<Value>) -> Result<(), String> {

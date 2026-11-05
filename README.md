@@ -242,6 +242,7 @@ Enter를 눌러야 전달될 수 있고, 그 줄바꿈은 다음 입력에 남�
 | `야다 하야하` | `yada hayaha` | `ヤダ ハヤハ` | 새 빈 배열을 스택에 추가 |
 | `야다 뿌루` | `yada ppuru` | `ヤダ プル` | 배열, 정수 → 배열 |
 | `야다 우라` | `yada ura` | `ヤダ ウラ` | 배열 → 배열, 마지막 정수 |
+| `야다 우라라` | `yada urara` | `ヤダ ウララ` | 배열 → 원본 배열, 독립된 복사본 |
 | `야다 뿌루루` | `yada ppururu` | `ヤダ プルル` | 배열 → 길이 |
 | `야다 이야` | `yada iya` | `ヤダ イヤ` | 배열, 인덱스 → 원소 |
 | `야다 핫` | `yada hat` | `ヤダ ハッ` | 배열, 인덱스, 값 → 피연산자 소비 |
@@ -287,6 +288,34 @@ printf '가나다' | cargo run -- run examples/reverse_input.yaha --lang ko
 
 출력: `다나가`. 입력에 줄바꿈을 넣으면 줄바꿈도 뒤집힌 위치에 출력됩니다.
 
+### 배열을 독립적으로 복사하기
+
+`뿌루`는 같은 배열을 가리키는 참조를 복제하고, `야다 우라라`는 배열 내용을
+별도의 배열에 복사합니다. 원본 참조는 그대로 두고 복사본을 스택 맨 위에 넣습니다.
+빈 배열도 복사할 수 있고, 정수나 빈 스택에 쓰면 실행 오류이며 상태를 바꾸지 않습니다.
+
+```text
+야다 하야하
+하야하 뿌루 야하
+야다 뿌루
+야다 우라라
+하야하 뿌루뿌루 야하
+야다 뿌루
+```
+
+처음 `[1]`을 만들고 복사한 다음, 복사본에만 2를 추가합니다.
+REPL에서 이어서 `:stack`을 입력하면 `[[1], [1, 2]]`가 나옵니다.
+`야다 우라라` 대신 `뿌루`를 쓰면 같은 배열을 공유하므로 `[[1, 2], [1, 2]]`가 됩니다.
+원본에 대한 기존 참조들은 계속 원본을 공유하고, 복사본의 수정·추가·제거는 원본에 영향을 주지 않습니다.
+
+[array_copy.yaha](examples/array_copy.yaha)는 복사본 길이 2와 원본 길이 1을 차례로 출력합니다.
+
+```sh
+cargo run -- run examples/array_copy.yaha --lang ko
+```
+
+출력: `21`. 구절은 줄바꿈으로 나눌 수 있지만 `야다 ; 우라라`처럼 쓸 수는 없습니다.
+
 ## 언어 설정과 오류
 
 `run`과 `repl`에서 `--lang ko`, `--lang en`, `--lang ja`로 코드의 언어 표기를 선택합니다. 한 프로그램 안에서는 같은 표기를 사용합니다.\
@@ -319,6 +348,7 @@ cargo run -- repl --lang ko --error-style friendly
 | [add_two_numbers.yaha](examples/add_two_numbers.yaha) | 정수 두 개의 합 출력 |
 | [character_echo.yaha](examples/character_echo.yaha) | EOF까지 입력 문자 그대로 출력 |
 | [integer_echo.yaha](examples/integer_echo.yaha) | 입력 정수 출력 |
+| [array_copy.yaha](examples/array_copy.yaha) | 복사본과 원본 길이를 출력해 `21` 확인 |
 | [array_push_pop.yaha](examples/array_push_pop.yaha) | 1, 2를 추가하고 꺼내 `21` 출력 |
 | [reverse_input.yaha](examples/reverse_input.yaha) | EOF까지 읽은 문자의 순서를 뒤집어 출력 |
 | [array_access.yaha](examples/array_access.yaha) | 배열 수정과 조회 |

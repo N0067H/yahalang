@@ -845,3 +845,80 @@ fn skipped_loop_breaks_and_invalid_targets_are_checked() {
     let error = execute(&program, &mut Cursor::new(b""), &mut Vec::new()).unwrap_err();
     assert_eq!(error.message, "invalid instruction target");
 }
+
+#[test]
+fn array_copy_spellings_and_phrase_boundaries() {
+    let expected = compile("야다 우라라");
+    assert_eq!(
+        expected.lines[0],
+        vec![yahalang::parser::Instruction::ArrayCopy]
+    );
+    for (language, source) in [
+        (Language::Korean, "야다우라라"),
+        (Language::English, "yadaurara"),
+        (Language::Japanese, "ヤダウララ"),
+    ] {
+        assert_eq!(parse(&lex(source, language).unwrap()).unwrap(), expected);
+    }
+    assert!(malformed("야다 ; 우라라"));
+    assert_eq!(
+        run(
+            "야다 하야하 야다\n우라라 야다 뿌루루 이이이야하 뿌루루 야다 뿌루루 이이이야하 뿌루루",
+            ""
+        ),
+        (Ok(()), "00".to_owned())
+    );
+}
+
+#[test]
+fn array_copy_is_independent_while_duplicate_keeps_sharing() {
+    use yahalang::executor::ExecutionState;
+    let mut state = ExecutionState::default();
+    let setup =
+        "야다 하야하 하야하 뿌루 야하 야다 뿌루 뿌루 야다 우라라 하야하 뿌루뿌루 야하 야다 뿌루";
+    state
+        .execute(&compile(setup), &mut Cursor::new(b""), &mut Vec::new())
+        .unwrap();
+    assert_eq!(state.stack_display(), "[[1], [1], [1, 2]]");
+    let mutate = "이야 뿌루 하야하 야하 하야하 뿌루뿌루뿌루 야하 야다 핫";
+    state
+        .execute(&compile(mutate), &mut Cursor::new(b""), &mut Vec::new())
+        .unwrap();
+    assert_eq!(state.stack_display(), "[[3], [1, 2]]");
+    state
+        .execute(
+            &compile("야다 우라 우라 뿌루"),
+            &mut Cursor::new(b""),
+            &mut Vec::new(),
+        )
+        .unwrap();
+    assert_eq!(state.stack_display(), "[[3], [1]]");
+}
+
+#[test]
+fn array_copy_errors_preserve_existing_values() {
+    use yahalang::executor::ExecutionState;
+    for (setup, expected, message) in [
+        ("", "[]", "stack underflow"),
+        ("하야하 뿌루 야하", "[1]", "expected an array"),
+    ] {
+        let mut state = ExecutionState::default();
+        state
+            .execute(&compile(setup), &mut Cursor::new(b""), &mut Vec::new())
+            .unwrap();
+        let error = state
+            .execute(
+                &compile("\n야다 우라라"),
+                &mut Cursor::new(b""),
+                &mut Vec::new(),
+            )
+            .unwrap_err();
+        assert_eq!(error.line, 2);
+        assert!(error.message.contains(message), "{error:?}");
+        assert_eq!(state.stack_display(), expected);
+    }
+    assert_eq!(
+        run(include_str!("../examples/array_copy.yaha"), ""),
+        (Ok(()), "21".to_owned())
+    );
+}

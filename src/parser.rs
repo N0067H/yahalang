@@ -41,6 +41,7 @@ pub enum Instruction {
     ArrayLength,
     ArrayAppend,
     ArrayPop,
+    ArrayCopy,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -281,9 +282,10 @@ impl Parser {
             TokenKind::Hat => Instruction::ArraySet,
             TokenKind::Ppuru => Instruction::ArrayAppend,
             TokenKind::Ura => Instruction::ArrayPop,
+            TokenKind::Urara => Instruction::ArrayCopy,
             _ => {
                 return Err(self.incomplete_error(
-                    "expected hayaha, ppuru, ppururu, iya, hat, or ura after yada",
+                    "expected hayaha, ppuru, ppururu, iya, hat, ura, or urara after yada",
                 ));
             }
         };
