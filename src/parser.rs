@@ -43,6 +43,7 @@ pub enum Instruction {
 pub struct ParseError {
     pub span: Span,
     pub message: String,
+    pub incomplete: bool,
 }
 
 impl std::fmt::Display for ParseError {
@@ -64,6 +65,7 @@ pub fn parse(tokens: &[Token]) -> Result<Program, ParseError> {
         return Err(ParseError {
             span: tokens.last().map_or(Span { start: 0, end: 0 }, |t| t.span),
             message: "expected exactly one final EOF token".to_owned(),
+            incomplete: false,
         });
     }
 
@@ -106,7 +108,7 @@ impl Parser {
         }
 
         if closing.is_some() && !closed {
-            return Err(self.error("unclosed block"));
+            return Err(self.incomplete_error("unclosed block"));
         }
 
         Ok(())
@@ -186,7 +188,13 @@ impl Parser {
         self.expect(TokenKind::Iya)?;
         let marker = self.current().kind;
         if !matches!(marker, TokenKind::Yada | TokenKind::Yaha) || !self.phrase(&[marker, marker]) {
-            return Err(self.error("expected yada yada or yaha yaha after iya"));
+            let mut error = self.incomplete_error("expected yada yada or yaha yaha after iya");
+            error.incomplete |= matches!(marker, TokenKind::Yada | TokenKind::Yaha)
+                && self
+                    .tokens
+                    .get(self.cursor + 1)
+                    .is_some_and(|(t, _)| t.kind == TokenKind::Eof);
+            return Err(error);
         }
 
         self.cursor += 2;
@@ -236,7 +244,7 @@ impl Parser {
             TokenKind::Yaha => Instruction::CompareGreater,
             TokenKind::Iya => Instruction::CompareLess,
             TokenKind::Hat => Instruction::CompareEqual,
-            _ => return Err(self.error("expected yaha, iya, or hat after haa")),
+            _ => return Err(self.incomplete_error("expected yaha, iya, or hat after haa")),
         };
         self.cursor += 1;
 
@@ -247,6 +255,11 @@ impl Parser {
         use TokenKind::*;
 
         let suffix = self.current().kind;
+        if suffix == Eof || self.phrase(&[Yada, Eof]) {
+            let mut error = self.error("expected a complete phrase after ura");
+            error.incomplete = true;
+            return Err(error);
+        }
         self.cursor += 1;
 
         match suffix {
@@ -330,7 +343,7 @@ impl Parser {
 
     fn expect(&mut self, kind: TokenKind) -> Result<(), ParseError> {
         if !self.at(kind) {
-            return Err(self.error(&format!("expected {kind:?}")));
+            return Err(self.incomplete_error(&format!("expected {kind:?}")));
         }
         self.cursor += 1;
 
@@ -352,10 +365,17 @@ impl Parser {
         self.current().kind == kind
     }
 
+    fn incomplete_error(&self, message: &str) -> ParseError {
+        let mut error = self.error(message);
+        error.incomplete = self.at(TokenKind::Eof);
+        error
+    }
+
     fn error(&self, message: &str) -> ParseError {
         ParseError {
             span: self.current().span,
             message: message.to_owned(),
+            incomplete: false,
         }
     }
 }

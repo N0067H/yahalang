@@ -19,8 +19,9 @@ cargo run -- repl --lang en
 ```
 
 Run the Korean example files with `--lang ko` to print `Hello, world!` followed by a newline in the first example, and `321` in the second.\
-The REPL runs one line at a time with a fresh stack and fresh arrays, so blocks must close on the same line.\
-Type `:q` or `:quit` to exit.
+The REPL preserves the stack and arrays between submissions. Unfinished blocks, numbers, and phrases continue at the `...>` prompt and execute once complete.
+Use `:stack` to inspect values from bottom to top, `:reset` to clear values and pending source, and `:q` or `:quit` to exit.
+Syntax errors discard pending source; runtime errors preserve changes made before the error. `yat` ends only the current submission. EOF reports unfinished source.
 
 ## Numbers and commands
 

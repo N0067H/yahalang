@@ -5,7 +5,7 @@ use std::process::ExitCode;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use clap::{Parser, Subcommand, ValueEnum};
-use yahalang::executor::execute;
+use yahalang::executor::{ExecutionState, execute};
 use yahalang::language::Language;
 use yahalang::lexer::lex;
 use yahalang::parser::parse;
@@ -21,7 +21,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    #[command(about = "Start an interactive one-line REPL")]
+    #[command(about = "Start an interactive REPL")]
     Repl {
         #[arg(long, value_enum)]
         lang: Option<CliLanguage>,
@@ -278,9 +278,15 @@ fn repl(language: Language, error_style: ErrorStyle) -> io::Result<()> {
     let mut input = stdin.lock();
     let mut output = stdout.lock();
     let mut line = String::new();
+    let mut session = ReplSession::default();
 
     loop {
-        write!(output, "yaha> ")?;
+        let prompt = if session.source.is_empty() {
+            "yaha> "
+        } else {
+            "...> "
+        };
+        write!(output, "{prompt}")?;
         output.flush()?;
 
         line.clear();
@@ -288,34 +294,96 @@ fn repl(language: Language, error_style: ErrorStyle) -> io::Result<()> {
             break;
         }
 
-        let command = line.trim_end_matches(['\r', '\n']);
-        match command {
-            ":quit" | ":q" => break,
-            "" => {}
-            _ => run_repl_source(command, language, error_style, &mut input, &mut output)?,
+        if !session.accept(&line, language, error_style, &mut input, &mut output)? {
+            return Ok(());
         }
     }
 
+    if !session.source.is_empty() {
+        let _ =
+            compile(&session.source, language, error_style).map_err(|error| eprintln!("{error}"));
+    }
+
     Ok(())
+}
+
+#[derive(Default)]
+struct ReplSession {
+    state: ExecutionState,
+    source: String,
+}
+
+impl ReplSession {
+    fn accept<R: BufRead, W: Write>(
+        &mut self,
+        line: &str,
+        language: Language,
+        error_style: ErrorStyle,
+        input: &mut R,
+        output: &mut W,
+    ) -> io::Result<bool> {
+        let command = line.trim();
+        if matches!(command, ":q" | ":quit") {
+            return Ok(false);
+        }
+        if command == ":stack" {
+            writeln!(output, "{}", self.state.stack_display())?;
+            return Ok(true);
+        }
+        if command == ":reset" {
+            self.state.reset();
+            self.source.clear();
+            return Ok(true);
+        }
+        if command.starts_with(':') {
+            eprintln!("unknown REPL command: {command}");
+            return Ok(true);
+        }
+        if command.is_empty() && self.source.is_empty() {
+            return Ok(true);
+        }
+
+        self.source.push_str(line);
+        if run_repl_source(
+            &self.source,
+            language,
+            error_style,
+            &mut self.state,
+            input,
+            output,
+        )? {
+            self.source.clear();
+        }
+        Ok(true)
+    }
 }
 
 fn run_repl_source<R: BufRead, W: Write>(
     source: &str,
     language: Language,
     error_style: ErrorStyle,
+    state: &mut ExecutionState,
     input: &mut R,
     output: &mut W,
-) -> io::Result<()> {
+) -> io::Result<bool> {
+    let incomplete = lex(source, language)
+        .ok()
+        .and_then(|tokens| parse(&tokens).err())
+        .is_some_and(|error| error.incomplete);
+    if incomplete {
+        return Ok(false);
+    }
+
     let program = match compile(source, language, error_style) {
         Ok(program) => program,
         Err(error) => {
             eprintln!("{error}");
-            return Ok(());
+            return Ok(true);
         }
     };
 
     let mut repl_output = ReplOutput::new(output);
-    let result = execute(&program, input, &mut repl_output);
+    let result = state.execute(&program, input, &mut repl_output);
 
     if repl_output
         .last_byte
@@ -329,7 +397,7 @@ fn run_repl_source<R: BufRead, W: Write>(
         eprintln!("{}", format_runtime_error(error, error_style));
     }
 
-    Ok(())
+    Ok(true)
 }
 
 struct ReplOutput<'a, W> {

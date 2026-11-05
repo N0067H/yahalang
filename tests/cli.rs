@@ -153,3 +153,79 @@ fn set_language_persists_in_config_and_cli_option_overrides_it() {
     fs::remove_file(english_source).unwrap();
     fs::remove_dir_all(config_dir).unwrap();
 }
+
+fn repl_session(source: &str) -> (String, String) {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_yahalang"))
+        .args(["repl", "--lang", "ko", "--error-style", "friendly"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(source.as_bytes())
+        .unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success());
+    (
+        String::from_utf8(output.stdout).unwrap(),
+        String::from_utf8(output.stderr).unwrap(),
+    )
+}
+
+#[test]
+fn repl_preserves_values_and_array_aliases_between_submissions() {
+    let (output, errors) = repl_session(
+        "[하야하 야하]\n뿌루\n하야하 야하 하야하 뿌루 야하 =\n:stack\n하야하 야하 @ 이이이야하 뿌루루\n:stack\n:q\n",
+    );
+    assert!(errors.is_empty(), "{errors}");
+    assert!(output.contains("yaha> [[1]]\n"), "{output}");
+    assert!(output.contains("yaha> 1\n"), "{output}");
+    assert!(output.contains("yaha> []\n"), "{output}");
+}
+
+#[test]
+fn repl_waits_for_nested_blocks_without_executing_partial_source() {
+    let (output, errors) = repl_session(
+        "하야하 뿌루 야하\n이야 야하야하\n하야하 뿌루뿌루 야하\n이야 야다야다\n뿌루 이이이야하 뿌루루\n하야하 뿌루 야하 우라 야하\n우라 야다야다\n우라 야하야하\n:stack\n:q\n",
+    );
+    assert!(errors.is_empty(), "{errors}");
+    assert!(output.contains("...> 21\nyaha> [0]\n"), "{output}");
+}
+
+#[test]
+fn repl_reset_discards_pending_source_and_stack() {
+    let (output, errors) = repl_session(
+        "하야하 뿌루 야하\n이야 야다야다\n:stack\n:reset\n:stack\n하야하\n뿌루 야하\n:stack\n:q\n",
+    );
+    assert!(errors.is_empty(), "{errors}");
+    assert!(output.contains("...> [1]\n"), "{output}");
+    assert!(output.contains("yaha> []\n"), "{output}");
+    assert!(output.ends_with("yaha> [1]\nyaha> "), "{output}");
+}
+
+#[test]
+fn repl_recovers_from_syntax_and_runtime_errors() {
+    let (output, errors) =
+        repl_session("하야하 뿌루 야하\n하아 뿌루\n야하\n:stack\n:wat\n:reset\n:stack\n:q\n");
+    assert!(
+        errors.contains("expected yaha, iya, or hat after haa"),
+        "{errors}"
+    );
+    assert!(errors.contains("stack underflow"), "{errors}");
+    assert!(errors.contains("unknown REPL command"), "{errors}");
+    assert!(output.contains("yaha> [1]\n"), "{output}");
+    assert!(output.ends_with("yaha> []\nyaha> "), "{output}");
+}
+
+#[test]
+fn repl_reports_incomplete_source_at_eof_and_reads_program_input() {
+    let (_, errors) = repl_session("이야 야다야다\n");
+    assert!(errors.contains("unclosed block"), "{errors}");
+    let (output, errors) = repl_session("이이이야하\n42\n:stack\n얏\n:stack\n:q\n");
+    assert!(errors.is_empty(), "{errors}");
+    assert_eq!(output.matches("[42]").count(), 2, "{output}");
+}

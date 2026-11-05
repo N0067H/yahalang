@@ -51,12 +51,52 @@ enum BinaryOperation {
     CompareGreater,
 }
 
+#[derive(Default)]
+pub struct ExecutionState {
+    stack: Vec<Value>,
+}
+
+impl ExecutionState {
+    pub fn reset(&mut self) {
+        self.stack.clear();
+    }
+
+    pub fn stack_display(&self) -> String {
+        let values: Vec<_> = self
+            .stack
+            .iter()
+            .map(|value| match value {
+                Value::Integer(value) => value.to_string(),
+                Value::Array(array) => format!("{:?}", array.borrow()),
+            })
+            .collect();
+        format!("[{}]", values.join(", "))
+    }
+
+    pub fn execute<R: BufRead, W: Write>(
+        &mut self,
+        program: &Program,
+        input: &mut R,
+        output: &mut W,
+    ) -> Result<(), RuntimeError> {
+        execute_with_stack(program, &mut self.stack, input, output)
+    }
+}
+
 pub fn execute<R: BufRead, W: Write>(
     program: &Program,
     input: &mut R,
     output: &mut W,
 ) -> Result<(), RuntimeError> {
-    let mut stack = Vec::new();
+    ExecutionState::default().execute(program, input, output)
+}
+
+fn execute_with_stack<R: BufRead, W: Write>(
+    program: &Program,
+    stack: &mut Vec<Value>,
+    input: &mut R,
+    output: &mut W,
+) -> Result<(), RuntimeError> {
     let instructions: Vec<_> = program
         .lines
         .iter()
@@ -71,7 +111,7 @@ pub fn execute<R: BufRead, W: Write>(
     let mut pc = 0;
 
     while let Some(&(line, index, instruction)) = instructions.get(pc) {
-        let flow = execute_instruction(instruction, &mut stack, input, output, line, index)?;
+        let flow = execute_instruction(instruction, stack, input, output, line, index)?;
         pc = next_instruction(flow, pc, instructions.len()).map_err(|message| RuntimeError {
             line,
             instruction: index,
