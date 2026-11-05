@@ -276,3 +276,12 @@ fn repl_array_copy_stays_independent_between_submissions() {
     assert!(errors.is_empty(), "{errors}");
     assert!(output.contains("[[1], [1, 2]]"), "{output}");
 }
+
+#[test]
+fn repl_prints_character_array_and_preserves_its_duplicate() {
+    let source = "야다 하야하\n이이이야하 야다 뿌루\n65\n뿌루\n야다\n이이이야하\n:stack\n:q\n";
+    let (output, errors) = repl_session(source);
+    assert!(errors.is_empty(), "{errors}");
+    assert!(output.contains("...> A\n"), "{output}");
+    assert!(output.contains("[[65]]"), "{output}");
+}

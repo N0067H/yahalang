@@ -77,6 +77,7 @@ REPL은 입력 사이에 스택과 배열을 유지합니다. 블록이나 숫�
 | `우라라 이이이야하` | `urara iiiiyaha` | `ウララ イイイヤハ` | 문자 입력, EOF는 -1 |
 | `이이이야하 뿌루루` | `iiiiyaha ppururu` | `イイイヤハ プルル` | 정수 출력 |
 | `이이이야하 우라라` | `iiiiyaha urara` | `イイイヤハ ウララ` | 유니코드 문자 출력 |
+| `야다 이이이야하` | `yada iiiiyaha` | `ヤダ イイイヤハ` | 정수 배열을 문자들로 출력 |
 | `우라 이야` | `ura iya` | `ウラ イヤ` | 가장 가까운 반복문 탈출 |
 | `얏` | `yat` | `ヤッ` | 프로그램 종료 |
 
@@ -316,6 +317,37 @@ cargo run -- run examples/array_copy.yaha --lang ko
 
 출력: `21`. 구절은 줄바꿈으로 나눌 수 있지만 `야다 ; 우라라`처럼 쓸 수는 없습니다.
 
+### 배열을 문자로 출력하기
+
+`야다 이이이야하`는 배열의 정수를 코드 포인트로 해석해 앞에서부터 출력합니다.
+자동 줄바꿈은 없고, 성공하면 배열 참조 하나를 스택에서 꺼냅니다. 배열 내용은 바꾸지 않습니다.
+배열을 다시 쓰려면 먼저 `뿌루`로 참조를 복제합니다. 빈 배열은 아무것도 출력하지 않습니다.
+
+```text
+야다 하야하
+우라라 이이이야하
+야다 뿌루
+우라라 이이이야하
+야다 뿌루
+야다 이이이야하
+```
+
+입력으로 `가나`를 전달하면 두 문자를 배열 `[44032, 45208]`에 모은 뒤 `가나`를 출력합니다.
+코드에 숫자를 길게 쓰지 않아도 입력한 문자로 배열을 만들 수 있습니다.
+
+[print_character_array.yaha](examples/print_character_array.yaha)는 EOF까지 문자를 모은 뒤
+배열 전체를 한 번에 출력합니다. 입력이 끝나기 전에는 출력하지 않습니다.
+
+```sh
+printf '안녕!\n' | cargo run -- run examples/print_character_array.yaha --lang ko
+```
+
+출력은 `안녕!`과 입력에 들어 있던 줄바꿈입니다. 공백과 NUL도 그대로 출력합니다.
+문자 입력의 EOF 값인 -1은 배열에 넣으면 안 됩니다. 음수·서로게이트·유니코드 범위를 벗어난 값이
+하나라도 있으면 출력하기 전에 오류를 내며 스택도 유지합니다.
+스택 부족·정수 타입 입력도 실행 오류입니다. 출력 장치 오류 때는 배열 참조를 유지하지만
+이미 전달된 출력은 되돌릴 수 없습니다. 구절 중간의 줄바꿈은 허용하고 `;`는 허용하지 않습니다.
+
 ## 언어 설정과 오류
 
 `run`과 `repl`에서 `--lang ko`, `--lang en`, `--lang ja`로 코드의 언어 표기를 선택합니다. 한 프로그램 안에서는 같은 표기를 사용합니다.\
@@ -348,6 +380,7 @@ cargo run -- repl --lang ko --error-style friendly
 | [add_two_numbers.yaha](examples/add_two_numbers.yaha) | 정수 두 개의 합 출력 |
 | [character_echo.yaha](examples/character_echo.yaha) | EOF까지 입력 문자 그대로 출력 |
 | [integer_echo.yaha](examples/integer_echo.yaha) | 입력 정수 출력 |
+| [print_character_array.yaha](examples/print_character_array.yaha) | EOF까지 문자를 모아 배열 전체 출력 |
 | [array_copy.yaha](examples/array_copy.yaha) | 복사본과 원본 길이를 출력해 `21` 확인 |
 | [array_push_pop.yaha](examples/array_push_pop.yaha) | 1, 2를 추가하고 꺼내 `21` 출력 |
 | [reverse_input.yaha](examples/reverse_input.yaha) | EOF까지 읽은 문자의 순서를 뒤집어 출력 |

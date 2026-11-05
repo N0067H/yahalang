@@ -35,6 +35,7 @@ pub enum Instruction {
     ReadCharacter,
     PrintInteger,
     PrintCharacter,
+    PrintCharacterArray,
     ArrayLiteral(Vec<i64>),
     ArrayGet,
     ArraySet,
@@ -283,9 +284,10 @@ impl Parser {
             TokenKind::Ppuru => Instruction::ArrayAppend,
             TokenKind::Ura => Instruction::ArrayPop,
             TokenKind::Urara => Instruction::ArrayCopy,
+            TokenKind::Iiiiyaha => Instruction::PrintCharacterArray,
             _ => {
                 return Err(self.incomplete_error(
-                    "expected hayaha, ppuru, ppururu, iya, hat, ura, or urara after yada",
+                    "expected hayaha, ppuru, ppururu, iya, hat, ura, urara, or iiiiyaha after yada",
                 ));
             }
         };

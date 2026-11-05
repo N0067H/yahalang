@@ -213,3 +213,26 @@ yahalang run examples/array_copy.yaha --lang ko
 ```
 
 Output: `21`, the length of the modified copy followed by the original length. The phrase may cross a newline but cannot contain `;`.
+
+## Printing character arrays
+
+`yada iiiiyaha` (`야다 이이이야하` / `ヤダ イイイヤハ`) prints an integer array as Unicode characters in array order, without an automatic newline. On success it consumes one array reference without modifying the array. Use `ppuru` first to keep the array. An empty array prints nothing.
+
+```text
+yada hayaha
+urara iiiiyaha
+yada ppuru
+urara iiiiyaha
+yada ppuru
+yada iiiiyaha
+```
+
+Input `Hi` produces `Hi`: the characters are collected in `[72, 105]` and then printed together.
+
+```sh
+printf 'Hello, 안녕!\n' | yahalang run examples/print_character_array.yaha --lang ko
+```
+
+The example collects characters until EOF before printing the entire array. Input whitespace, newlines, and NUL are preserved. EOF's -1 must not be stored as a character.
+
+Every element is validated before output begins. Invalid Unicode values, wrong types, or stack underflow produce no output and leave the stack unchanged. An output device failure also leaves the array reference on the stack, but bytes already written cannot be rolled back. The phrase may cross a newline but cannot contain `;`.

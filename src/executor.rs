@@ -255,6 +255,7 @@ fn execute_instruction<R: BufRead, W: Write>(
         Instruction::ArrayAppend => array_append(stack).map_err(error)?,
         Instruction::ArrayPop => array_pop(stack).map_err(error)?,
         Instruction::ArrayCopy => array_copy(stack).map_err(error)?,
+        Instruction::PrintCharacterArray => print_character_array(stack, output).map_err(error)?,
         Instruction::ArrayLength => {
             let array = pop_array(stack).map_err(error)?;
             let length = array.borrow().len();
@@ -263,6 +264,32 @@ fn execute_instruction<R: BufRead, W: Write>(
     }
 
     Ok(Flow::Continue)
+}
+
+fn print_character_array<W: Write>(stack: &mut Vec<Value>, output: &mut W) -> Result<(), String> {
+    let array = stack
+        .last()
+        .ok_or_else(|| "stack underflow".to_owned())?
+        .as_array()?;
+    let mut text = String::new();
+    for (index, value) in array.borrow().iter().copied().enumerate() {
+        let character = u32::try_from(value)
+            .ok()
+            .and_then(char::from_u32)
+            .ok_or_else(|| {
+                format!("{value} at array index {index} is not a Unicode scalar value")
+            })?;
+        text.push(character);
+    }
+
+    output
+        .write_all(text.as_bytes())
+        .map_err(|error| format!("output failed: {error}"))?;
+    output
+        .flush()
+        .map_err(|error| format!("output flush failed: {error}"))?;
+    stack.pop();
+    Ok(())
 }
 
 fn array_copy(stack: &mut Vec<Value>) -> Result<(), String> {

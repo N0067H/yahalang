@@ -922,3 +922,149 @@ fn array_copy_errors_preserve_existing_values() {
         (Ok(()), "21".to_owned())
     );
 }
+
+#[test]
+fn character_array_output_spellings_and_boundaries() {
+    let expected = compile("야다 이이이야하");
+    assert_eq!(
+        expected.lines[0],
+        vec![yahalang::parser::Instruction::PrintCharacterArray]
+    );
+    for (language, source) in [
+        (Language::Korean, "야다이이이야하"),
+        (Language::English, "yadaiiiiyaha"),
+        (Language::Japanese, "ヤダイイイヤハ"),
+    ] {
+        assert_eq!(parse(&lex(source, language).unwrap()).unwrap(), expected);
+    }
+    assert!(malformed("야다 ; 이이이야하"));
+    assert_eq!(
+        run("야다 하야하 야다\n이이이야하", ""),
+        (Ok(()), String::new())
+    );
+    let source = "야다 하야하 이이이야하 야다 뿌루 야다 이이이야하";
+    assert_eq!(run(source, "65\n"), (Ok(()), "A".to_owned()));
+}
+
+#[test]
+fn character_array_output_handles_unicode_and_preserves_shared_arrays() {
+    use yahalang::executor::ExecutionState;
+    use yahalang::parser::Instruction;
+    let values = vec![65, 0, 44032, 0x1f980, 0x10ffff, 13, 10];
+    let mut state = ExecutionState::default();
+    let mut output = Vec::new();
+    let program = Program {
+        lines: vec![vec![
+            Instruction::ArrayLiteral(values.clone()),
+            Instruction::Duplicate,
+            Instruction::PrintCharacterArray,
+        ]],
+    };
+    state
+        .execute(&program, &mut Cursor::new(b""), &mut output)
+        .unwrap();
+    assert_eq!(output, "A\0가🦀\u{10ffff}\r\n".as_bytes());
+    assert_eq!(state.stack_display(), format!("[{values:?}]"));
+    state
+        .execute(
+            &compile("야다 이이이야하"),
+            &mut Cursor::new(b""),
+            &mut Vec::new(),
+        )
+        .unwrap();
+    assert_eq!(state.stack_display(), "[]");
+}
+
+#[test]
+fn character_array_output_validates_every_element_before_writing() {
+    use yahalang::executor::ExecutionState;
+    use yahalang::parser::Instruction;
+    for invalid in [-1, 0xd800, 0xdfff, 0x110000, i64::MAX] {
+        let mut state = ExecutionState::default();
+        let setup = Program {
+            lines: vec![vec![Instruction::ArrayLiteral(vec![65, invalid])]],
+        };
+        state
+            .execute(&setup, &mut Cursor::new(b""), &mut Vec::new())
+            .unwrap();
+        let before = state.stack_display();
+        let mut output = Vec::new();
+        let error = state
+            .execute(
+                &compile("\n야다 이이이야하"),
+                &mut Cursor::new(b""),
+                &mut output,
+            )
+            .unwrap_err();
+        assert_eq!(error.line, 2);
+        assert!(error.message.contains("array index 1"));
+        assert!(output.is_empty());
+        assert_eq!(state.stack_display(), before);
+    }
+    assert!(
+        run("야다 이이이야하", "")
+            .0
+            .unwrap_err()
+            .message
+            .contains("stack underflow")
+    );
+    assert!(
+        run("하야하 야하 야다 이이이야하", "")
+            .0
+            .unwrap_err()
+            .message
+            .contains("expected an array")
+    );
+}
+
+#[test]
+fn character_array_example_collects_and_prints_input_until_eof() {
+    for input in ["", "Hello!", "한글 🦀\r\n", "a\0b"] {
+        assert_eq!(
+            run(
+                include_str!("../examples/print_character_array.yaha"),
+                input
+            ),
+            (Ok(()), input.to_owned())
+        );
+    }
+}
+
+#[test]
+fn character_array_output_keeps_array_on_write_or_flush_failure() {
+    use std::io::{self, Write};
+    use yahalang::executor::ExecutionState;
+    struct FailingOutput {
+        fail_write: bool,
+    }
+    impl Write for FailingOutput {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            match self.fail_write {
+                true => Err(io::Error::other("write failure")),
+                false => Ok(bytes.len()),
+            }
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Err(io::Error::other("flush failure"))
+        }
+    }
+    for fail_write in [true, false] {
+        let mut state = ExecutionState::default();
+        state
+            .execute(
+                &compile("야다 하야하 이이이야하 야다 뿌루"),
+                &mut Cursor::new(b"65\n"),
+                &mut Vec::new(),
+            )
+            .unwrap();
+        let error = state
+            .execute(
+                &compile("야다 이이이야하"),
+                &mut Cursor::new(b""),
+                &mut FailingOutput { fail_write },
+            )
+            .unwrap_err();
+        assert!(error.message.contains("output"), "{error:?}");
+        assert_eq!(state.stack_display(), "[[65]]");
+    }
+}
