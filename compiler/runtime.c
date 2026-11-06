@@ -8,6 +8,9 @@ typedef struct{Yi n,c,*d;}Ya;
 typedef struct{Ya*a;Yi v;}Yv;
 static Yv*ys;static Yi yt,yc;
 static void ye(int u){fflush(stdout);fputs(u?"ui\n":"haa? haa?\n",stderr);exit(1);}
+static void yflush(void){
+    if(fflush(stdout)||ferror(stdout))ye(0);
+}
 static void*ym(void*q,size_t s){q=realloc(q,s?s:1);if(!q){fputs("out of memory\n",stderr);exit(1);}return q;}
 static void yp(Ya*x,Yi v){if(yt==yc){yc=yc?yc*2:64;ys=ym(ys,yc*sizeof*ys);}ys[yt].a=x;ys[yt++].v=v;}
 static Yv*yk(Yi k){if(yt<k)ye(0);return ys+yt-k;}
@@ -42,18 +45,18 @@ static void X(void){yk(1);yt--;}
 static void W(void){Yv*x=yk(2),y=x[0];x[0]=x[1];x[1]=y;}
 static int C(void){return yi(1)!=0;}
 static int F(void){Yi v=yi(1);yt--;return v!=0;}
-static void H(void){if(fflush(stdout)||ferror(stdout))ye(0);exit(0);}
-static void I(void){char b[1026];int k=0,h,s=0,e,g=0;Yi v=0;fflush(stdout);
+static void H(void){yflush();exit(0);}
+static void I(void){char b[1026];int k=0,h,s=0,e,g=0;Yi v=0;yflush();
 while(k<1025&&(h=getchar())!=EOF){b[k++]=h;if(h=='\n')break;}
 if(ferror(stdin)||k>1024||!k)ye(1);e=k;while(s<e&&ys_(b[s]))s++;while(e>s&&ys_(b[e-1]))e--;
 if(s<e&&(b[s]=='+'||b[s]=='-')){g=b[s]=='-';s++;}if(s==e)ye(1);
 for(;s<e;s++){int t=b[s]-'0';if(t<0||t>9||__builtin_mul_overflow(v,10,&v)||(g?__builtin_sub_overflow(v,t,&v):__builtin_add_overflow(v,t,&v)))ye(1);}
 yp(0,v);}
-static void K(void){unsigned char q[4];int h,k,i;Yi v;fflush(stdout);h=getchar();
+static void K(void){unsigned char q[4];int h,k,i;Yi v;yflush();h=getchar();
 if(h==EOF){if(ferror(stdin))ye(1);yp(0,-1);return;}
 q[0]=h;k=yl(h);if(!k)ye(1);for(i=1;i<k;i++){if((h=getchar())==EOF)ye(1);q[i]=h;}
 v=yu(q,k);if(v<0)ye(1);yp(0,v);}
-static void T(void){Yi k=0,z=0,i;int h;unsigned char*q=0;Ya*x;fflush(stdout);
+static void T(void){Yi k=0,z=0,i;int h;unsigned char*q=0;Ya*x;yflush();
 while(k<1048579&&(h=getchar())!=EOF){if(k==z){z=z?z*2:256;q=ym(q,z);}q[k++]=h;if(h=='\n')break;}
 if(ferror(stdin))ye(1);if(!k)ye(0);if(q[k-1]=='\n'){k--;if(k&&q[k-1]=='\r')k--;}if(k>1048576)ye(0);
 x=yz();for(i=0;i<k;){int m=yl(q[i]);Yi v;if(!m||i+m>k||(v=yu(q+i,m))<0)ye(1);yg(x,v);i+=m;}
