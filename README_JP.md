@@ -399,3 +399,20 @@ cargo run -- repl --lang ja --error-style friendly
 `reverse_input.yaha` はコードポイントの順番を反転します。結合文字や複数のコードポイントでできた絵文字をまとめて扱うわけではありません。入力に改行があれば、その改行も反転した位置に出力します。
 
 `break_on_zero.yaha` には終了値の0を入力してください。`truth_machine.yaha` に1を入れると出力が続くので、Ctrl-C で停止します。
+
+### アルゴリズムと文字列処理
+
+既存の命令を組み合わせたプログラムです。入力形式、実行例、作業用配列の配置は、韓国語の[サンプルガイド](examples/README.md)にまとめています。
+
+| ファイル | 動作 |
+| --- | --- |
+| [factorial.yaha](examples/factorial.yaha) | Nの階乗を計算 |
+| [gcd.yaha](examples/gcd.yaha) | 整数2つの最大公約数 |
+| [fibonacci.yaha](examples/fibonacci.yaha) | フィボナッチ数列の先頭N項を出力 |
+| [is_prime.yaha](examples/is_prime.yaha) | 素数かどうか判定 |
+| [number_stats.yaha](examples/number_stats.yaha) | N個の整数の合計・最小値・最大値 |
+| [array_sort.yaha](examples/array_sort.yaha) | 入力のコピーを昇順に並べ替える |
+| [palindrome.yaha](examples/palindrome.yaha) | 文字列が回文かどうか判定 |
+| [character_frequency.yaha](examples/character_frequency.yaha) | 指定した文字の出現回数 |
+| [caesar_cipher.yaha](examples/caesar_cipher.yaha) | 英字のシーザー暗号と復号 |
+| [postfix_calculator.yaha](examples/postfix_calculator.yaha) | 整数の後置記法式を計算 |

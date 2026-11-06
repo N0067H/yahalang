@@ -399,3 +399,20 @@ cargo run -- repl --lang ko --error-style friendly
 `reverse_input.yaha`는 코드 포인트 순서를 뒤집습니다. 결합 문자나 여러 코드 포인트로 된 이모지를 묶어서 처리하지는 않습니다. 입력에 줄바꿈이 있으면 줄바꿈도 뒤집힌 위치에 출력됩니다.
 
 `break_on_zero.yaha`는 종료값으로 0을 입력해야 합니다. `truth_machine.yaha`에 1을 넣으면 계속 출력하므로 Ctrl-C로 멈춥니다.
+
+### 알고리즘과 문자열 처리
+
+다음 예제는 현재 명령을 조합해 작성한 프로그램입니다. 입력 형식, 실행 예시와 작업용 배열의 칸 배치는 [대표 프로그램 안내](examples/README.md)에 정리했습니다.
+
+| 파일 | 동작 |
+| --- | --- |
+| [factorial.yaha](examples/factorial.yaha) | N의 팩토리얼 |
+| [gcd.yaha](examples/gcd.yaha) | 두 정수의 최대공약수 |
+| [fibonacci.yaha](examples/fibonacci.yaha) | 처음 N개 피보나치 항 출력 |
+| [is_prime.yaha](examples/is_prime.yaha) | 소수 여부 판별 |
+| [number_stats.yaha](examples/number_stats.yaha) | N개 정수의 합·최솟값·최댓값 |
+| [array_sort.yaha](examples/array_sort.yaha) | 원본을 복사해 오름차순 정렬 |
+| [palindrome.yaha](examples/palindrome.yaha) | 문자열의 회문 여부 판별 |
+| [character_frequency.yaha](examples/character_frequency.yaha) | 문자열에서 지정한 문자의 개수 |
+| [caesar_cipher.yaha](examples/caesar_cipher.yaha) | 영문자 시저 암호·복호화 |
+| [postfix_calculator.yaha](examples/postfix_calculator.yaha) | 정수 후위 표기식 계산 |

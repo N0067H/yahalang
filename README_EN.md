@@ -399,3 +399,20 @@ Character array output validates character values before writing and keeps the a
 `reverse_input.yaha` reverses code points, not whole combining sequences or multi-code-point emoji. An input newline is reversed along with the rest of the text.
 
 End input to `break_on_zero.yaha` with 0. If you enter 1 into `truth_machine.yaha`, stop its repeated output with Ctrl-C.
+
+### Algorithms and text processing
+
+These programs use the existing language commands. The [example guide](examples/README.md), written in Korean, documents input formats, sample runs, and the working array layouts.
+
+| File | Behavior |
+| --- | --- |
+| [factorial.yaha](examples/factorial.yaha) | Compute N factorial |
+| [gcd.yaha](examples/gcd.yaha) | Compute the greatest common divisor of two integers |
+| [fibonacci.yaha](examples/fibonacci.yaha) | Print the first N Fibonacci terms |
+| [is_prime.yaha](examples/is_prime.yaha) | Test whether an integer is prime |
+| [number_stats.yaha](examples/number_stats.yaha) | Print the sum, minimum, and maximum of N integers |
+| [array_sort.yaha](examples/array_sort.yaha) | Sort a copy of the input in ascending order |
+| [palindrome.yaha](examples/palindrome.yaha) | Test whether a string is a palindrome |
+| [character_frequency.yaha](examples/character_frequency.yaha) | Count a given character in a string |
+| [caesar_cipher.yaha](examples/caesar_cipher.yaha) | Encrypt or decrypt ASCII letters with a Caesar shift |
+| [postfix_calculator.yaha](examples/postfix_calculator.yaha) | Evaluate an integer postfix expression |
