@@ -453,3 +453,33 @@ cargo run -- repl --lang ja --error-style friendly
 | [character_frequency.yaha](examples/character_frequency.yaha) | 指定した文字の出現回数 |
 | [caesar_cipher.yaha](examples/caesar_cipher.yaha) | 英字のシーザー暗号と復号 |
 | [postfix_calculator.yaha](examples/postfix_calculator.yaha) | 整数の後置記法式を計算 |
+
+## Yahalang で書かれたコンパイラ
+
+[compiler/yahac.yaha](compiler/yahac.yaha) は、Yahalang で書かれた Yahalang→C コンパイラ yahac です。標準入力からプログラムを読み、単体で動く C プログラムを標準出力に書きます。英語・韓国語・日本語の表記は自動で判別しますが、1つのプログラムには1つの表記しか使えません。
+
+```sh
+cargo run --release -- run compiler/yahac.yaha --lang ko < examples/countdown.yaha > countdown.c
+cc -O2 -o countdown countdown.c && ./countdown
+```
+
+コンパイルされたプログラムはインタプリタと同じ規則に従います。オーバーフローや UTF-8 の入出力も同じように扱い、エラー時は `haa? haa?` か `ui` を出力して終了コード 1 で終わります。コンパイルできないプログラムの場合、yahac は何も出力せず実行時エラーで止まります。
+
+yahac は自分自身もコンパイルできます。そこから作ったネイティブのコンパイラは、同じ C コードをもう一度生成します。
+
+```sh
+cargo run --release -- run compiler/yahac.yaha --lang ko < compiler/yahac.yaha > yahac.c
+cc -O1 -o yahac yahac.c
+./yahac < compiler/yahac.yaha | cmp - yahac.c
+```
+
+Yahalang にはコメントも名前もないため、[compiler/gen_yahac.py](compiler/gen_yahac.py) が読みやすい記述から `yahac.yaha` を生成します。[compiler/runtime.c](compiler/runtime.c) は生成するすべてのプログラムに含まれる C ランタイムです。どちらかを変更したら、次の順序で再生成してテストします。
+
+```sh
+python3 compiler/gen_yahac.py
+cargo build --release
+python3 compiler/test_yahac.py
+python3 compiler/test_regressions.py
+```
+
+比較テストは `target/release/yahalang` を使うため、先にリリース用インタプリタをビルドしてください。

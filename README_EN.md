@@ -453,3 +453,33 @@ These programs use the existing language commands. The [example guide](examples/
 | [character_frequency.yaha](examples/character_frequency.yaha) | Count a given character in a string |
 | [caesar_cipher.yaha](examples/caesar_cipher.yaha) | Encrypt or decrypt ASCII letters with a Caesar shift |
 | [postfix_calculator.yaha](examples/postfix_calculator.yaha) | Evaluate an integer postfix expression |
+
+## Compiler written in Yahalang
+
+[compiler/yahac.yaha](compiler/yahac.yaha) is yahac, a Yahalang-to-C compiler written in Yahalang. It reads a program on standard input and writes a self-contained C program to standard output. yahac detects whether the program uses English, Korean or Japanese spelling, but each program must use only one of them.
+
+```sh
+cargo run --release -- run compiler/yahac.yaha --lang ko < examples/countdown.yaha > countdown.c
+cc -O2 -o countdown countdown.c && ./countdown
+```
+
+The compiled program follows the same rules as the interpreter: arithmetic overflow, UTF-8 input and output, and errors print `haa? haa?` or `ui` and exit with status 1. If a program can't be compiled, yahac writes nothing and stops with a runtime error.
+
+yahac can also compile itself. The native compiler built from that output produces identical C again:
+
+```sh
+cargo run --release -- run compiler/yahac.yaha --lang ko < compiler/yahac.yaha > yahac.c
+cc -O1 -o yahac yahac.c
+./yahac < compiler/yahac.yaha | cmp - yahac.c
+```
+
+Yahalang has no comments or names, so [compiler/gen_yahac.py](compiler/gen_yahac.py) generates `yahac.yaha` from a readable description. [compiler/runtime.c](compiler/runtime.c) is the C runtime included in every generated program. After changing either file, regenerate the compiler and run the tests in this order:
+
+```sh
+python3 compiler/gen_yahac.py
+cargo build --release
+python3 compiler/test_yahac.py
+python3 compiler/test_regressions.py
+```
+
+The differential tests use `target/release/yahalang`, so build the release interpreter before running them.
