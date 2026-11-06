@@ -62,6 +62,10 @@ impl std::fmt::Display for ParseError {
 impl std::error::Error for ParseError {}
 
 pub fn parse(tokens: &[Token]) -> Result<Program, ParseError> {
+    parse_with_spans(tokens).map(|(program, _)| program)
+}
+
+pub fn parse_with_spans(tokens: &[Token]) -> Result<(Program, Vec<Span>), ParseError> {
     if tokens
         .last()
         .is_none_or(|token| token.kind != TokenKind::Eof)
@@ -91,19 +95,23 @@ pub fn parse(tokens: &[Token]) -> Result<Program, ParseError> {
         tokens: significant,
         cursor: 0,
         lines: vec![Vec::new(); line + 1],
+        spans: vec![Vec::new(); line + 1],
         instruction_count: 0,
         loop_breaks: Vec::new(),
     };
     parser.sequence(None, 0)?;
-    Ok(Program {
+    let program = Program {
         lines: parser.lines,
-    })
+    };
+    let spans = parser.spans.into_iter().flatten().collect();
+    Ok((program, spans))
 }
 
 struct Parser {
     tokens: Vec<(Token, usize)>,
     cursor: usize,
     lines: Vec<Vec<Instruction>>,
+    spans: Vec<Vec<Span>>,
     instruction_count: usize,
     loop_breaks: Vec<Vec<(usize, usize)>>,
 }
@@ -147,8 +155,9 @@ impl Parser {
         }
 
         let line = self.line();
+        let start = self.cursor;
         let instruction = self.instruction()?;
-        self.emit(line, instruction);
+        self.emit(line, instruction, self.consumed_span(start));
 
         Ok(false)
     }
@@ -184,13 +193,14 @@ impl Parser {
         }
 
         let line = self.line();
+        let source_start = self.cursor;
         let marker = self.block_marker()?;
         let start = self.instruction_count;
         let instruction = match marker {
             TokenKind::Yada => Instruction::WhileStart(0),
             _ => Instruction::IfStart(0),
         };
-        let slot = self.emit(line, instruction);
+        let slot = self.emit(line, instruction, self.consumed_span(source_start));
 
         if marker == TokenKind::Yada {
             self.loop_breaks.push(Vec::new());
@@ -225,7 +235,11 @@ impl Parser {
         }
 
         let end_line = self.tokens[self.cursor - 3].1;
-        self.emit(end_line, Instruction::WhileEnd(start));
+        self.emit(
+            end_line,
+            Instruction::WhileEnd(start),
+            self.consumed_span(self.cursor - 3),
+        );
         self.lines[line][slot] = Instruction::WhileStart(self.instruction_count);
         let breaks = self.loop_breaks.pop().expect("loop context exists");
         for (line, slot) in breaks {
@@ -238,8 +252,9 @@ impl Parser {
             return Err(self.error("loop break is only valid inside a loop"));
         }
         let line = self.line();
+        let start = self.cursor;
         self.cursor += 2;
-        let slot = self.emit(line, Instruction::Break(0));
+        let slot = self.emit(line, Instruction::Break(0), self.consumed_span(start));
         self.loop_breaks
             .last_mut()
             .expect("loop context exists")
@@ -383,9 +398,17 @@ impl Parser {
         Ok(value)
     }
 
-    fn emit(&mut self, line: usize, instruction: Instruction) -> usize {
+    fn consumed_span(&self, start: usize) -> Span {
+        Span {
+            start: self.tokens[start].0.span.start,
+            end: self.tokens[self.cursor - 1].0.span.end,
+        }
+    }
+
+    fn emit(&mut self, line: usize, instruction: Instruction, span: Span) -> usize {
         let slot = self.lines[line].len();
         self.lines[line].push(instruction);
+        self.spans[line].push(span);
         self.instruction_count += 1;
 
         slot

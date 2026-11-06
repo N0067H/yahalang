@@ -295,3 +295,130 @@ fn repl_reads_a_string_and_keeps_following_commands() {
     assert!(output.contains("yaha> 가나\n"), "{output}");
     assert!(output.ends_with("yaha> []\nyaha> "), "{output}");
 }
+
+#[test]
+fn trace_reports_original_phrases_and_locations_without_changing_stdout() {
+    let source = temp_source("  하야하\n 뿌루 야하 ; 뿌루\n야하\n이이이야하 뿌루루\n");
+    let output = Command::new(env!("CARGO_BIN_EXE_yahalang"))
+        .arg("run")
+        .arg(&source)
+        .args(["--lang", "ko", "--trace"])
+        .output()
+        .unwrap();
+    fs::remove_file(&source).unwrap();
+    assert!(output.status.success());
+    assert_eq!(output.stdout, b"2");
+    let trace = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        trace.contains(&format!(
+            "{}:1:3 before \"하야하 뿌루 야하\" stack=[]",
+            source.display()
+        )),
+        "{trace}"
+    );
+    assert!(trace.contains(":2:10 before \"뿌루\" stack=[1]"), "{trace}");
+    assert!(
+        trace.contains(":3:1 before \"야하\" stack=[1, 1]"),
+        "{trace}"
+    );
+    assert!(trace.contains(":3:1 after \"야하\" stack=[2]"), "{trace}");
+    assert!(
+        trace.contains(":4:1 after \"이이이야하 뿌루루\" stack=[]"),
+        "{trace}"
+    );
+}
+
+#[test]
+fn trace_uses_the_selected_language_and_reports_runtime_errors() {
+    for (language, program, phrase) in [
+        ("en", "hayaha ppuru yaha\nyaha", "yaha"),
+        ("ja", "ハヤハ プル ヤハ\nヤハ", "ヤハ"),
+    ] {
+        let source = temp_source(program);
+        let output = Command::new(env!("CARGO_BIN_EXE_yahalang"))
+            .arg("run")
+            .arg(&source)
+            .args(["--lang", language, "--trace"])
+            .output()
+            .unwrap();
+        fs::remove_file(source).unwrap();
+        assert!(!output.status.success());
+        assert!(output.stdout.is_empty());
+        let trace = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            trace.contains(&format!(
+                ":2:1 error {phrase:?} stack=[1] error=\"stack underflow\""
+            )),
+            "{trace}"
+        );
+    }
+}
+
+#[test]
+fn repl_trace_keeps_state_and_uses_buffer_relative_source_locations() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_yahalang"))
+        .args(["repl", "--lang", "ko", "--trace"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all("하야하 뿌루 야하\n이야 야다야다\n우라 이야\n우라 야다야다\n뿌루\n야하\n이이이야하 뿌루루\n:q\n".as_bytes()).unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success());
+    assert!(String::from_utf8(output.stdout).unwrap().contains("2\n"));
+    let trace = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        trace.contains("<repl>:2:1 before \"우라 이야\" stack=[1]"),
+        "{trace}"
+    );
+    assert!(
+        trace.contains("<repl>:1:1 before \"야하\" stack=[1, 1]"),
+        "{trace}"
+    );
+    assert!(!trace.contains("\"우라 야다야다\""), "{trace}");
+}
+
+#[test]
+fn trace_does_not_execute_invalid_source() {
+    let source = temp_source("하야하 뿌루 야하 .");
+    let output = Command::new(env!("CARGO_BIN_EXE_yahalang"))
+        .arg("run")
+        .arg(&source)
+        .args(["--lang", "ko", "--trace"])
+        .output()
+        .unwrap();
+    fs::remove_file(source).unwrap();
+    assert!(!output.status.success());
+    assert!(
+        !String::from_utf8(output.stderr)
+            .unwrap()
+            .contains("[trace]")
+    );
+}
+
+#[test]
+fn documented_trace_example_matches_the_displayed_log() {
+    let output = Command::new(env!("CARGO_BIN_EXE_yahalang"))
+        .args([
+            "run",
+            "examples/trace_stack.yaha",
+            "--lang",
+            "ko",
+            "--trace",
+        ])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(output.stdout, b"4");
+    let trace = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        trace.contains("[trace] examples/trace_stack.yaha:3:1 before \"야하\" stack=[2, 2]"),
+        "{trace}"
+    );
+    assert!(
+        trace.contains("[trace] examples/trace_stack.yaha:3:1 after \"야하\" stack=[4]"),
+        "{trace}"
+    );
+}

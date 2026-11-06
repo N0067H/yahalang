@@ -5,10 +5,11 @@ use std::process::ExitCode;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use clap::{Parser, Subcommand, ValueEnum};
-use yahalang::executor::{ExecutionState, execute};
+use yahalang::executor::{ExecutionState, TraceEvent, TraceStatus};
 use yahalang::language::Language;
 use yahalang::lexer::lex;
-use yahalang::parser::parse;
+use yahalang::parser::{Program, parse, parse_with_spans};
+use yahalang::token::Span;
 
 static NEXT_CONFIG_TEMP_FILE: AtomicU64 = AtomicU64::new(0);
 
@@ -27,6 +28,8 @@ enum Command {
         lang: Option<CliLanguage>,
         #[arg(long, value_enum, default_value = "usagi")]
         error_style: ErrorStyle,
+        #[arg(long, help = "Trace source locations and stack changes to stderr")]
+        trace: bool,
     },
     #[command(about = "Run a program from a source file")]
     Run {
@@ -35,6 +38,8 @@ enum Command {
         lang: Option<CliLanguage>,
         #[arg(long, value_enum, default_value = "usagi")]
         error_style: ErrorStyle,
+        #[arg(long, help = "Trace source locations and stack changes to stderr")]
+        trace: bool,
     },
     #[command(about = "Save a default setting")]
     Set {
@@ -90,15 +95,22 @@ fn main() -> ExitCode {
 
 fn dispatch(command: Command) -> Result<(), String> {
     match command {
-        Command::Repl { lang, error_style } => selected_language(lang)
-            .and_then(|language| repl(language, error_style).map_err(|error| error.to_string()))
+        Command::Repl {
+            lang,
+            error_style,
+            trace,
+        } => selected_language(lang)
+            .and_then(|language| {
+                repl(language, error_style, trace).map_err(|error| error.to_string())
+            })
             .map_err(|error| format!("yahalang: {error}")),
         Command::Run {
             file,
             lang,
             error_style,
+            trace,
         } => selected_language(lang)
-            .and_then(|language| run_file(&file, language, error_style))
+            .and_then(|language| run_file(&file, language, error_style, trace))
             .map_err(|error| format!("{}: {error}", file.display())),
         Command::Set { key, language } => {
             save_setting(&key, language).map_err(|error| format!("yahalang: {error}"))
@@ -262,23 +274,39 @@ fn default_config_dir() -> Result<PathBuf, String> {
     }
 }
 
-fn run_file(file: &PathBuf, language: Language, error_style: ErrorStyle) -> Result<(), String> {
+fn run_file(
+    file: &PathBuf,
+    language: Language,
+    error_style: ErrorStyle,
+    trace: bool,
+) -> Result<(), String> {
     let source = fs::read_to_string(file).map_err(|error| error.to_string())?;
     let program = compile(&source, language, error_style)?;
     let stdin = io::stdin();
     let stdout = io::stdout();
 
-    execute(&program, &mut stdin.lock(), &mut stdout.lock())
+    program
+        .execute(
+            &source,
+            &file.display().to_string(),
+            &mut ExecutionState::default(),
+            &mut stdin.lock(),
+            &mut stdout.lock(),
+            trace,
+        )
         .map_err(|error| format_runtime_error(error, error_style))
 }
 
-fn repl(language: Language, error_style: ErrorStyle) -> io::Result<()> {
+fn repl(language: Language, error_style: ErrorStyle, trace: bool) -> io::Result<()> {
     let stdin = io::stdin();
     let stdout = io::stdout();
     let mut input = stdin.lock();
     let mut output = stdout.lock();
     let mut line = String::new();
-    let mut session = ReplSession::default();
+    let mut session = ReplSession {
+        trace,
+        ..ReplSession::default()
+    };
 
     loop {
         let prompt = if session.source.is_empty() {
@@ -311,6 +339,7 @@ fn repl(language: Language, error_style: ErrorStyle) -> io::Result<()> {
 struct ReplSession {
     state: ExecutionState,
     source: String,
+    trace: bool,
 }
 
 impl ReplSession {
@@ -351,6 +380,7 @@ impl ReplSession {
             &mut self.state,
             input,
             output,
+            self.trace,
         )? {
             self.source.clear();
         }
@@ -365,6 +395,7 @@ fn run_repl_source<R: BufRead, W: Write>(
     state: &mut ExecutionState,
     input: &mut R,
     output: &mut W,
+    trace: bool,
 ) -> io::Result<bool> {
     let incomplete = lex(source, language)
         .ok()
@@ -383,7 +414,7 @@ fn run_repl_source<R: BufRead, W: Write>(
     };
 
     let mut repl_output = ReplOutput::new(output);
-    let result = state.execute(&program, input, &mut repl_output);
+    let result = program.execute(source, "<repl>", state, input, &mut repl_output, trace);
 
     if repl_output
         .last_byte
@@ -429,11 +460,93 @@ impl<W: Write> Write for ReplOutput<'_, W> {
     }
 }
 
+struct CompiledProgram {
+    program: Program,
+    spans: Vec<Span>,
+}
+
+struct TraceLocation {
+    line: usize,
+    column: usize,
+    phrase: String,
+}
+
+impl CompiledProgram {
+    fn execute<R: BufRead, W: Write>(
+        &self,
+        source: &str,
+        label: &str,
+        state: &mut ExecutionState,
+        input: &mut R,
+        output: &mut W,
+        trace: bool,
+    ) -> Result<(), yahalang::executor::RuntimeError> {
+        if !trace {
+            return state.execute(&self.program, input, output);
+        }
+        let locations = trace_locations(source, &self.spans);
+        let stderr = io::stderr();
+        let mut writer = stderr.lock();
+        state.execute_with_trace(&self.program, input, output, |event| {
+            write_trace(&mut writer, label, &locations[event.offset], event)
+        })
+    }
+}
+
+fn trace_locations(source: &str, spans: &[Span]) -> Vec<TraceLocation> {
+    let mut locations = Vec::with_capacity(spans.len());
+    let mut previous = 0;
+    let mut line = 1;
+    let mut column = 1;
+    for span in spans {
+        let prefix = &source[previous..span.start];
+        line += prefix.bytes().filter(|byte| *byte == b'\n').count();
+        column = prefix.rsplit_once('\n').map_or_else(
+            || column + prefix.chars().count(),
+            |(_, suffix)| suffix.chars().count() + 1,
+        );
+        let phrase = source[span.start..span.end]
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        locations.push(TraceLocation {
+            line,
+            column,
+            phrase,
+        });
+        previous = span.start;
+    }
+    locations
+}
+
+fn write_trace<W: Write>(
+    writer: &mut W,
+    label: &str,
+    location: &TraceLocation,
+    event: TraceEvent<'_>,
+) -> io::Result<()> {
+    let status = match event.status {
+        TraceStatus::Before => "before",
+        TraceStatus::After => "after",
+        TraceStatus::Error(_) => "error",
+    };
+    write!(
+        writer,
+        "[trace] {label}:{}:{} {status} {:?} stack={}",
+        location.line, location.column, location.phrase, event.stack
+    )?;
+    if let TraceStatus::Error(message) = event.status {
+        write!(writer, " error={message:?}")?;
+    }
+    writeln!(writer)?;
+    writer.flush()
+}
+
 fn compile(
     source: &str,
     language: Language,
     error_style: ErrorStyle,
-) -> Result<yahalang::parser::Program, String> {
+) -> Result<CompiledProgram, String> {
     let tokens = lex(source, language).map_err(|error| {
         let (line, column) = location(source, error.span.start);
         match error_style {
@@ -445,13 +558,15 @@ fn compile(
         }
     })?;
 
-    parse(&tokens).map_err(|error| {
-        let (line, column) = location(source, error.span.start);
-        match error_style {
-            ErrorStyle::Usagi => format!("{line}:{column}: {error}"),
-            ErrorStyle::Friendly => format!("{line}:{column}: {}", error.message),
-        }
-    })
+    parse_with_spans(&tokens)
+        .map(|(program, spans)| CompiledProgram { program, spans })
+        .map_err(|error| {
+            let (line, column) = location(source, error.span.start);
+            match error_style {
+                ErrorStyle::Usagi => format!("{line}:{column}: {error}"),
+                ErrorStyle::Friendly => format!("{line}:{column}: {}", error.message),
+            }
+        })
 }
 
 fn format_runtime_error(error: yahalang::executor::RuntimeError, style: ErrorStyle) -> String {
