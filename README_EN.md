@@ -7,7 +7,7 @@ Yahalang is a small stack-based esolang that uses Usagi’s sounds from *Chiikaw
 You can write it in Korean, English or Japanese, using a stack to work with signed 64-bit integers and integer arrays.
 
 If you’re coming from an older version, you’ll need to update code that uses `ura yaha` numbers, `ui` input or line-number jumps to match the new grammar.\
-See the examples below and the full grammar in [DESIGN.md](DESIGN.md) (in Korean).
+See the examples below.
 
 ## Running
 
