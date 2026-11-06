@@ -459,7 +459,7 @@ cargo run -- repl --lang ja --error-style friendly
 [compiler/yahac.yaha](compiler/yahac.yaha) は、Yahalang で書かれた Yahalang→C コンパイラ yahac です。標準入力からプログラムを読み、単体で動く C プログラムを標準出力に書きます。英語・韓国語・日本語の表記は自動で判別しますが、1つのプログラムには1つの表記しか使えません。
 
 ```sh
-yahalang run compiler/yahac.yaha --lang ko < examples/countdown.yaha > countdown.c
+cargo run --release -- run compiler/yahac.yaha --lang ko < examples/countdown.yaha > countdown.c
 cc -O2 -o countdown countdown.c && ./countdown
 ```
 
@@ -468,9 +468,17 @@ cc -O2 -o countdown countdown.c && ./countdown
 yahac は自分自身もコンパイルできます。そこから作ったネイティブのコンパイラは、同じ C コードをもう一度生成します。
 
 ```sh
-yahalang run compiler/yahac.yaha --lang ko < compiler/yahac.yaha > yahac.c
+cargo run --release -- run compiler/yahac.yaha --lang ko < compiler/yahac.yaha > yahac.c
 cc -O1 -o yahac yahac.c
 ./yahac < compiler/yahac.yaha | cmp - yahac.c
 ```
 
-Yahalang にはコメントも名前もないため、`yahac.yaha` は [compiler/gen_yahac.py](compiler/gen_yahac.py) が読みやすい記述から生成します。[compiler/runtime.c](compiler/runtime.c) は yahac がすべてのプログラムに含める C ランタイムです。どちらかを変更したら `python3 compiler/gen_yahac.py` を実行し、`python3 compiler/test_yahac.py` でコンパイル結果とインタプリタの結果を比べてください。
+Yahalang にはコメントも名前もないため、[compiler/gen_yahac.py](compiler/gen_yahac.py) が読みやすい記述から `yahac.yaha` を生成します。[compiler/runtime.c](compiler/runtime.c) は生成するすべてのプログラムに含まれる C ランタイムです。どちらかを変更したら、次の順序で再生成してテストします。
+
+```sh
+python3 compiler/gen_yahac.py
+cargo build --release
+python3 compiler/test_yahac.py
+```
+
+比較テストは `target/release/yahalang` を使うため、先にリリース用インタプリタをビルドしてください。
