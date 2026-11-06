@@ -52,6 +52,24 @@ enum BinaryOperation {
     CompareGreater,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TraceStatus<'a> {
+    Before,
+    After,
+    Error(&'a str),
+}
+
+pub struct TraceEvent<'a> {
+    pub offset: usize,
+    pub line: usize,
+    pub instruction: usize,
+    pub operation: &'a Instruction,
+    pub status: TraceStatus<'a>,
+    pub stack: String,
+}
+
+type TraceObserver<'a> = dyn FnMut(TraceEvent<'_>) -> std::io::Result<()> + 'a;
+
 #[derive(Default)]
 pub struct ExecutionState {
     stack: Vec<Value>,
@@ -63,15 +81,20 @@ impl ExecutionState {
     }
 
     pub fn stack_display(&self) -> String {
-        let values: Vec<_> = self
-            .stack
-            .iter()
-            .map(|value| match value {
-                Value::Integer(value) => value.to_string(),
-                Value::Array(array) => format!("{:?}", array.borrow()),
-            })
-            .collect();
-        format!("[{}]", values.join(", "))
+        format_stack(&self.stack)
+    }
+
+    pub fn execute_with_trace<R: BufRead, W: Write, F>(
+        &mut self,
+        program: &Program,
+        input: &mut R,
+        output: &mut W,
+        mut observer: F,
+    ) -> Result<(), RuntimeError>
+    where
+        F: FnMut(TraceEvent<'_>) -> std::io::Result<()>,
+    {
+        execute_with_stack(program, &mut self.stack, input, output, Some(&mut observer))
     }
 
     pub fn execute<R: BufRead, W: Write>(
@@ -80,7 +103,7 @@ impl ExecutionState {
         input: &mut R,
         output: &mut W,
     ) -> Result<(), RuntimeError> {
-        execute_with_stack(program, &mut self.stack, input, output)
+        execute_with_stack(program, &mut self.stack, input, output, None)
     }
 }
 
@@ -97,6 +120,7 @@ fn execute_with_stack<R: BufRead, W: Write>(
     stack: &mut Vec<Value>,
     input: &mut R,
     output: &mut W,
+    mut observer: Option<&mut TraceObserver<'_>>,
 ) -> Result<(), RuntimeError> {
     let instructions: Vec<_> = program
         .lines
@@ -112,15 +136,83 @@ fn execute_with_stack<R: BufRead, W: Write>(
     let mut pc = 0;
 
     while let Some(&(line, index, instruction)) = instructions.get(pc) {
-        let flow = execute_instruction(instruction, stack, input, output, line, index)?;
-        pc = next_instruction(flow, pc, instructions.len()).map_err(|message| RuntimeError {
-            line,
-            instruction: index,
-            message,
-        })?;
+        pc = execute_step(
+            (pc, line, index, instruction),
+            instructions.len(),
+            stack,
+            input,
+            output,
+            &mut observer,
+        )?;
     }
 
     Ok(())
+}
+
+fn format_stack(stack: &[Value]) -> String {
+    let values: Vec<_> = stack
+        .iter()
+        .map(|value| match value {
+            Value::Integer(value) => value.to_string(),
+            Value::Array(array) => format!("{:?}", array.borrow()),
+        })
+        .collect();
+    format!("[{}]", values.join(", "))
+}
+
+fn execute_step<R: BufRead, W: Write>(
+    entry: (usize, usize, usize, &Instruction),
+    length: usize,
+    stack: &mut Vec<Value>,
+    input: &mut R,
+    output: &mut W,
+    observer: &mut Option<&mut TraceObserver<'_>>,
+) -> Result<usize, RuntimeError> {
+    let (pc, line, index, instruction) = entry;
+    notify_trace(observer, entry, stack, TraceStatus::Before)?;
+    let result =
+        execute_instruction(instruction, stack, input, output, line, index).and_then(|flow| {
+            next_instruction(flow, pc, length).map_err(|message| RuntimeError {
+                line,
+                instruction: index,
+                message,
+            })
+        });
+    match result {
+        Ok(next) => {
+            notify_trace(observer, entry, stack, TraceStatus::After)?;
+            Ok(next)
+        }
+        Err(error) => {
+            notify_trace(observer, entry, stack, TraceStatus::Error(&error.message))?;
+            Err(error)
+        }
+    }
+}
+
+fn notify_trace(
+    observer: &mut Option<&mut TraceObserver<'_>>,
+    entry: (usize, usize, usize, &Instruction),
+    stack: &[Value],
+    status: TraceStatus<'_>,
+) -> Result<(), RuntimeError> {
+    let Some(observer) = observer else {
+        return Ok(());
+    };
+    let (offset, line, instruction, operation) = entry;
+    observer(TraceEvent {
+        offset,
+        line,
+        instruction,
+        operation,
+        status,
+        stack: format_stack(stack),
+    })
+    .map_err(|error| RuntimeError {
+        line,
+        instruction,
+        message: format!("trace output failed: {error}"),
+    })
 }
 
 fn next_instruction(flow: Flow, current: usize, length: usize) -> Result<usize, String> {

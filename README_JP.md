@@ -361,6 +361,42 @@ cargo run -- set lang ja
 | macOS | `~/Library/Application Support/yahalang/config.toml` |
 | Windows | `%APPDATA%/yahalang/config.toml` |
 
+## 実行の追跡
+
+`run` または `repl` に `--trace` を付けると、実行する句、ソースの位置、スタックの内容を確認できます。
+
+```sh
+cargo run -- run examples/trace_stack.yaha --lang ko --trace
+cargo run -- repl --lang ja --trace
+```
+
+サンプルは2を複製して足し、`4` を出力します。足し算の前後には次の記録が表示されます。
+
+```text
+[trace] examples/trace_stack.yaha:3:1 before "야하" stack=[2, 2]
+[trace] examples/trace_stack.yaha:3:1 after "야하" stack=[4]
+```
+
+位置は `ファイル:行:列` で、行と列は1から数えます。列はバイト数ではなく文字数です。複数行にまたがる句は開始位置を使い、表示するときだけ空白を1つにまとめます。元のソースは変更しません。
+
+| 表示 | 意味 |
+| --- | --- |
+| `before` | 命令を実行する前のスタック。入力待ちになる命令も先に表示 |
+| `after` | 命令が成功した後のスタック |
+| `error` | 失敗時点のスタックと原因。その命令の `after` は表示しない |
+
+スタックは `:stack` と同じ順番で、配列は現在の内容で表示します。繰り返しは実行のたびに記録し、飛ばした本体は記録しません。条件ブロックの終了句には実行命令がないため、記録もありません。脱出命令や `ヤッ` で実行されなかった句も表示しません。
+
+REPL のファイル名は `<repl>`、行番号は現在の入力内の位置です。状態の保持や初期化の動作は変わりません。構文エラーで実行できなかったコードには追跡記録がありません。
+
+追跡記録は標準エラー、プログラムの出力は標準出力に送ります。別々のファイルにも保存できます。
+
+```sh
+cargo run -- run examples/trace_stack.yaha --lang ko --trace > result.txt 2> trace.log
+```
+
+`result.txt` には `4`、`trace.log` には追跡記録が入ります。Cargo のメッセージも標準エラーに含まれる場合があります。配列や繰り返しが大きいと記録も増えます。追跡記録の書き込みに失敗すると実行を止めますが、完了した命令は元に戻しません。
+
 ## エラーの確認
 
 既定のエラーメッセージはうさぎの声です。原因と位置を確認するには `--error-style friendly` を付けます。
@@ -380,6 +416,7 @@ cargo run -- repl --lang ja --error-style friendly
 
 | ファイル | 動作 |
 | --- | --- |
+| [trace_stack.yaha](examples/trace_stack.yaha) | 複製と足し算の前後のスタックを追跡 |
 | [hello_world.yaha](examples/hello_world.yaha) | `Hello, world!` と改行を出力 |
 | [add_two_numbers.yaha](examples/add_two_numbers.yaha) | 整数2つの合計を出力 |
 | [integer_echo.yaha](examples/integer_echo.yaha) | 整数1つを読んで出力 |

@@ -361,6 +361,42 @@ cargo run -- set lang ko
 | macOS | `~/Library/Application Support/yahalang/config.toml` |
 | Windows | `%APPDATA%/yahalang/config.toml` |
 
+## 실행 추적
+
+`run`이나 `repl`에 `--trace`를 붙이면 실행하는 구절과 위치, 스택을 확인할 수 있습니다.
+
+```sh
+cargo run -- run examples/trace_stack.yaha --lang ko --trace
+cargo run -- repl --lang ko --trace
+```
+
+예제는 2를 복제해 더하고 `4`를 출력합니다. 덧셈 전후의 추적 기록은 다음과 같습니다.
+
+```text
+[trace] examples/trace_stack.yaha:3:1 before "야하" stack=[2, 2]
+[trace] examples/trace_stack.yaha:3:1 after "야하" stack=[4]
+```
+
+위치는 `파일:줄:열`이며 줄과 열은 1부터 셉니다. 열은 바이트가 아닌 문자 수로 계산합니다. 여러 줄에 걸친 구절은 시작 위치를 표시하고, 표시할 때만 공백을 하나로 모읍니다. 원본 코드는 바꾸지 않습니다.
+
+| 표시 | 의미 |
+| --- | --- |
+| `before` | 명령 실행 전의 스택. 입력을 기다리는 명령도 먼저 표시 |
+| `after` | 명령이 성공한 뒤의 스택 |
+| `error` | 실패한 명령의 현재 스택과 오류 원인. 해당 명령의 `after`는 없음 |
+
+스택은 `:stack`과 같은 순서로, 배열은 현재 내용으로 표시합니다. 반복문은 실행할 때마다 기록하고, 건너뛴 본문은 기록하지 않습니다. 조건 블록 닫기는 실행 명령이 없어 따로 표시하지 않습니다. 반복 탈출이나 `얏` 뒤에서 실행되지 않은 구절도 표시하지 않습니다.
+
+REPL의 파일명은 `<repl>`이며 줄 번호는 현재 입력 묶음 안의 위치입니다. 추적을 켜도 스택 유지·초기화 규칙은 같습니다. 구문 오류로 실행하지 못한 코드에는 추적 기록이 없습니다.
+
+추적은 표준 오류로, 프로그램 출력은 표준 출력으로 보냅니다. 각각 파일에 저장할 수도 있습니다.
+
+```sh
+cargo run -- run examples/trace_stack.yaha --lang ko --trace > result.txt 2> trace.log
+```
+
+`result.txt`에는 `4`가, `trace.log`에는 추적 기록이 들어갑니다. Cargo 메시지도 표준 오류에 포함될 수 있습니다. 배열이 크거나 반복이 많으면 기록도 커집니다. 추적 기록을 쓰지 못하면 실행을 멈추며, 이미 실행한 명령은 되돌리지 않습니다.
+
 ## 오류 확인
 
 기본 오류 메시지는 우사기 말소리로 나옵니다. 원인과 위치를 확인하려면 `--error-style friendly`를 붙입니다.
@@ -380,6 +416,7 @@ cargo run -- repl --lang ko --error-style friendly
 
 | 파일 | 동작 |
 | --- | --- |
+| [trace_stack.yaha](examples/trace_stack.yaha) | 복제·덧셈 전후의 스택 추적 |
 | [hello_world.yaha](examples/hello_world.yaha) | `Hello, world!`와 줄바꿈 출력 |
 | [add_two_numbers.yaha](examples/add_two_numbers.yaha) | 정수 두 개의 합 출력 |
 | [integer_echo.yaha](examples/integer_echo.yaha) | 정수 하나를 읽어 출력 |

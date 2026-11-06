@@ -361,6 +361,42 @@ Settings are stored as TOML, for example `lang = "en"`.
 | macOS | `~/Library/Application Support/yahalang/config.toml` |
 | Windows | `%APPDATA%/yahalang/config.toml` |
 
+## Execution tracing
+
+Add `--trace` to `run` or `repl` to see executed phrases, source locations, and stack contents.
+
+```sh
+cargo run -- run examples/trace_stack.yaha --lang ko --trace
+cargo run -- repl --lang en --trace
+```
+
+The example duplicates 2, adds the two values, and prints `4`. The addition produces these trace entries:
+
+```text
+[trace] examples/trace_stack.yaha:3:1 before "야하" stack=[2, 2]
+[trace] examples/trace_stack.yaha:3:1 after "야하" stack=[4]
+```
+
+Locations use `file:line:column`, with lines and columns starting at 1. Columns count characters, not bytes. A multiline phrase uses its starting location; whitespace is collapsed only for display, without changing the source.
+
+| Status | Meaning |
+| --- | --- |
+| `before` | Stack before execution, including before a command waits for input |
+| `after` | Stack after a successful command |
+| `error` | Stack and error reason at the point of failure; no `after` entry follows for that command |
+
+The stack uses the same order as `:stack`, with arrays shown by their current contents. Each loop iteration is traced, but skipped bodies are not. A conditional closing phrase has no executable instruction and therefore no entry. Instructions skipped by a break or `yat` are not shown.
+
+REPL entries use `<repl>` as the filename and line numbers relative to the current submission. State persistence and reset behavior are unchanged. Source rejected during parsing produces no execution trace.
+
+Trace entries go to stderr; program output stays on stdout. To save them separately:
+
+```sh
+cargo run -- run examples/trace_stack.yaha --lang ko --trace > result.txt 2> trace.log
+```
+
+`result.txt` contains `4`, and `trace.log` contains the trace. Cargo messages may also appear on stderr. Large arrays and long-running loops can produce large logs. A trace write failure stops execution without rolling back completed instructions.
+
 ## Understanding errors
 
 Errors use Usagi sounds by default. Add `--error-style friendly` to see the cause and location.
@@ -380,6 +416,7 @@ Character array output validates character values before writing and keeps the a
 
 | File | Behavior |
 | --- | --- |
+| [trace_stack.yaha](examples/trace_stack.yaha) | Trace stack changes through duplication and addition |
 | [hello_world.yaha](examples/hello_world.yaha) | Print `Hello, world!` and a newline |
 | [add_two_numbers.yaha](examples/add_two_numbers.yaha) | Print the sum of two integers |
 | [integer_echo.yaha](examples/integer_echo.yaha) | Read and print one integer |
