@@ -479,6 +479,7 @@ Yahalang にはコメントも名前もないため、[compiler/gen_yahac.py](co
 python3 compiler/gen_yahac.py
 cargo build --release
 python3 compiler/test_yahac.py
+python3 compiler/test_regressions.py
 ```
 
 比較テストは `target/release/yahalang` を使うため、先にリリース用インタプリタをビルドしてください。

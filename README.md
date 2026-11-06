@@ -479,6 +479,7 @@ Yahalang에는 주석과 이름이 없어서, [compiler/gen_yahac.py](compiler/g
 python3 compiler/gen_yahac.py
 cargo build --release
 python3 compiler/test_yahac.py
+python3 compiler/test_regressions.py
 ```
 
 비교 테스트는 `target/release/yahalang`을 사용하므로 릴리즈 빌드를 먼저 준비해야 합니다.

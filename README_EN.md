@@ -479,6 +479,7 @@ Yahalang has no comments or names, so [compiler/gen_yahac.py](compiler/gen_yahac
 python3 compiler/gen_yahac.py
 cargo build --release
 python3 compiler/test_yahac.py
+python3 compiler/test_regressions.py
 ```
 
 The differential tests use `target/release/yahalang`, so build the release interpreter before running them.
