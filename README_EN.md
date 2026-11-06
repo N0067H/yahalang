@@ -256,3 +256,24 @@ printf '가나🦀\n' | yahalang run examples/string_length.yaha --lang ko
 The examples output `가나다` and `3`, respectively. Length counts Unicode scalar values, not grapheme clusters.
 
 Invalid UTF-8, I/O errors, and lines larger than 1 MiB excluding LF/CRLF report runtime errors without pushing a value. Consumed input is not rolled back. The REPL shares the same input stream; this command consumes only the next line. Phrases may cross newlines but cannot contain `;`.
+
+## Compiler written in Yahalang
+
+[compiler/yahac.yaha](compiler/yahac.yaha) is yahac, a Yahalang-to-C compiler written in Yahalang. It reads a program on standard input and writes a self-contained C program to standard output. yahac detects whether the program uses English, Korean or Japanese spelling, but each program must use only one of them.
+
+```sh
+yahalang run compiler/yahac.yaha --lang ko < examples/countdown.yaha > countdown.c
+cc -O2 -o countdown countdown.c && ./countdown
+```
+
+The compiled program follows the same rules as the interpreter: arithmetic overflow, UTF-8 input and output, and errors print `haa? haa?` or `ui` and exit with status 1. If a program can't be compiled, yahac writes nothing and stops with a runtime error.
+
+yahac can also compile itself. The native compiler built from that output produces identical C again:
+
+```sh
+yahalang run compiler/yahac.yaha --lang ko < compiler/yahac.yaha > yahac.c
+cc -O1 -o yahac yahac.c
+./yahac < compiler/yahac.yaha | cmp - yahac.c
+```
+
+Yahalang has no comments or names, so [compiler/gen_yahac.py](compiler/gen_yahac.py) writes `yahac.yaha` from a readable description, and [compiler/runtime.c](compiler/runtime.c) is the C runtime that yahac includes in every program. Run `python3 compiler/gen_yahac.py` after changing either file, and `python3 compiler/test_yahac.py` to compare compiled programs with the interpreter.

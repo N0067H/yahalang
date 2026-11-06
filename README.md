@@ -429,3 +429,24 @@ cargo run -- repl --lang ko --error-style friendly
 
 `truth_machine.yaha`에는 0이나 1을 입력하고, 1의 반복 출력은 Ctrl-C로 멈춥니다.
 
+
+## Yahalang으로 만든 컴파일러
+
+[compiler/yahac.yaha](compiler/yahac.yaha)는 Yahalang으로 작성한 Yahalang→C 컴파일러 yahac입니다. 표준 입력으로 프로그램을 읽어 독립적으로 실행되는 C 프로그램을 표준 출력에 씁니다. 한국어·영어·일본어 표기는 자동으로 알아내며, 한 프로그램에는 한 가지 표기만 쓸 수 있습니다.
+
+```sh
+yahalang run compiler/yahac.yaha --lang ko < examples/countdown.yaha > countdown.c
+cc -O2 -o countdown countdown.c && ./countdown
+```
+
+컴파일된 프로그램은 인터프리터와 같은 규칙을 따릅니다. 오버플로, UTF-8 입출력을 똑같이 처리하고, 오류가 나면 `haa? haa?` 또는 `ui`를 출력하고 상태 1로 끝납니다. 컴파일할 수 없는 프로그램이면 yahac은 아무것도 출력하지 않고 실행 오류로 멈춥니다.
+
+yahac은 자기 자신도 컴파일합니다. 그렇게 만든 네이티브 컴파일러는 똑같은 C 코드를 다시 만들어 냅니다.
+
+```sh
+yahalang run compiler/yahac.yaha --lang ko < compiler/yahac.yaha > yahac.c
+cc -O1 -o yahac yahac.c
+./yahac < compiler/yahac.yaha | cmp - yahac.c
+```
+
+Yahalang에는 주석과 이름이 없어서, `yahac.yaha`는 [compiler/gen_yahac.py](compiler/gen_yahac.py)가 읽기 쉬운 설명으로부터 만들어 냅니다. [compiler/runtime.c](compiler/runtime.c)는 yahac이 모든 프로그램에 넣는 C 런타임입니다. 두 파일을 고친 뒤에는 `python3 compiler/gen_yahac.py`를 실행하고, `python3 compiler/test_yahac.py`로 컴파일된 프로그램과 인터프리터의 결과를 비교합니다.

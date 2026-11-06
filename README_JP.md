@@ -261,3 +261,24 @@ printf '가나🦀\n' | yahalang run examples/string_length.yaha --lang ko
 出力はそれぞれ `가나다` と `3` です。長さは見た目の文字数ではなく Unicode スカラーの個数です。
 
 不正な UTF-8、I/O エラー、改行を除いて1 MiBを超える行は、新しい値を積まずに実行時エラーになります。消費した入力は元に戻せません。REPL と同じ入力ストリームを使い、次の1行だけを読みます。句内の改行は使えますが `;` は入れられません。
+
+## Yahalang で書かれたコンパイラ
+
+[compiler/yahac.yaha](compiler/yahac.yaha) は、Yahalang で書かれた Yahalang→C コンパイラ yahac です。標準入力からプログラムを読み、単体で動く C プログラムを標準出力に書きます。英語・韓国語・日本語の表記は自動で判別しますが、1つのプログラムには1つの表記しか使えません。
+
+```sh
+yahalang run compiler/yahac.yaha --lang ko < examples/countdown.yaha > countdown.c
+cc -O2 -o countdown countdown.c && ./countdown
+```
+
+コンパイルされたプログラムはインタプリタと同じ規則に従います。オーバーフローや UTF-8 の入出力も同じように扱い、エラー時は `haa? haa?` か `ui` を出力して終了コード 1 で終わります。コンパイルできないプログラムの場合、yahac は何も出力せず実行時エラーで止まります。
+
+yahac は自分自身もコンパイルできます。そこから作ったネイティブのコンパイラは、同じ C コードをもう一度生成します。
+
+```sh
+yahalang run compiler/yahac.yaha --lang ko < compiler/yahac.yaha > yahac.c
+cc -O1 -o yahac yahac.c
+./yahac < compiler/yahac.yaha | cmp - yahac.c
+```
+
+Yahalang にはコメントも名前もないため、`yahac.yaha` は [compiler/gen_yahac.py](compiler/gen_yahac.py) が読みやすい記述から生成します。[compiler/runtime.c](compiler/runtime.c) は yahac がすべてのプログラムに含める C ランタイムです。どちらかを変更したら `python3 compiler/gen_yahac.py` を実行し、`python3 compiler/test_yahac.py` でコンパイル結果とインタプリタの結果を比べてください。
