@@ -21,6 +21,9 @@ static void yflush(void){
     youtput_init();
     if(fflush(stdout)||ferror(stdout))ye(0);
 }
+static void yput(int byte){
+    if(putchar(byte)==EOF)ye(0);
+}
 static void*ym(void*q,size_t s){q=realloc(q,s?s:1);if(!q){fputs("out of memory\n",stderr);exit(1);}return q;}
 static void yp(Ya*x,Yi v){if(yt==yc){yc=yc?yc*2:64;ys=ym(ys,yc*sizeof*ys);}ys[yt].a=x;ys[yt++].v=v;}
 static Yv*yk(Yi k){if(yt<k)ye(0);return ys+yt-k;}
@@ -41,9 +44,9 @@ for(i=1;i<k;i++){if((q[i]&0xc0)!=0x80)return -1;v=v<<6|(q[i]&0x3f);}
 if(k==3&&(v<0x800||(v>=0xd800&&v<=0xdfff)))return -1;
 if(k==4&&(v<0x10000||v>0x10ffff))return -1;return v;}
 static int yv(Yi v){return v>=0&&v<=0x10ffff&&(v<0xd800||v>0xdfff);}
-static void yw(Yi v){if(v<0x80)putchar(v);else if(v<0x800){putchar(0xc0|v>>6);putchar(0x80|(v&63));}
-else if(v<0x10000){putchar(0xe0|v>>12);putchar(0x80|(v>>6&63));putchar(0x80|(v&63));}
-else{putchar(0xf0|v>>18);putchar(0x80|(v>>12&63));putchar(0x80|(v>>6&63));putchar(0x80|(v&63));}}
+static void yw(Yi v){if(v<0x80)yput(v);else if(v<0x800){yput(0xc0|v>>6);yput(0x80|(v&63));}
+else if(v<0x10000){yput(0xe0|v>>12);yput(0x80|(v>>6&63));yput(0x80|(v&63));}
+else{yput(0xf0|v>>18);yput(0x80|(v>>12&63));yput(0x80|(v>>6&63));yput(0x80|(v&63));}}
 static int ys_(int h){return h==' '||h=='\t'||h=='\n'||h=='\f'||h=='\r';}
 static void P(Yi v){yp(0,v);}
 static void A(void){yb(0);}static void S(void){yb(1);}static void M(void){yb(2);}
@@ -71,9 +74,9 @@ while(k<1048579&&(h=getchar())!=EOF){if(k==z){z=z?z*2:256;q=ym(q,z);}q[k++]=h;if
 if(ferror(stdin))ye(1);if(!k)ye(0);if(q[k-1]=='\n'){k--;if(k&&q[k-1]=='\r')k--;}if(k>1048576)ye(0);
 x=yz();for(i=0;i<k;){int m=yl(q[i]);Yi v;if(!m||i+m>k||(v=yu(q+i,m))<0)ye(1);yg(x,v);i+=m;}
 free(q);yp(x,0);}
-static void O(void){Yi v=yi(1);yt--;youtput_init();printf("%lld",v);}
-static void Q(void){Yi v=yi(1);if(!yv(v))ye(0);yt--;youtput_init();yw(v);}
-static void Z(void){Ya*x=ya(1);Yi i;for(i=0;i<x->n;i++)if(!yv(x->d[i]))ye(0);youtput_init();for(i=0;i<x->n;i++)yw(x->d[i]);yt--;}
+static void O(void){Yi v=yi(1);yt--;youtput_init();if(printf("%lld",v)<0)ye(0);yflush();}
+static void Q(void){Yi v=yi(1);if(!yv(v))ye(0);yt--;youtput_init();yw(v);yflush();}
+static void Z(void){Ya*x=ya(1);Yi i;for(i=0;i<x->n;i++)if(!yv(x->d[i]))ye(0);youtput_init();for(i=0;i<x->n;i++)yw(x->d[i]);yflush();yt--;}
 static void B(void){yp(yz(),0);}
 static void J(const Yi*q,Yi k){Ya*x=yz();Yi i;for(i=0;i<k;i++)yg(x,q[i]);yp(x,0);}
 static void V(void){Yi i=yi(1);Ya*x=ya(2);if(i<0||i>=x->n)ye(0);yt-=2;yp(0,x->d[i]);}
