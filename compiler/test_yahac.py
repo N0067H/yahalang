@@ -140,6 +140,22 @@ def compile_c(yahac, source, tmp, name):
     return exe, result
 
 
+def result_summary(result):
+    return result.returncode, result.stdout, reaction(result.stderr)
+
+
+def is_parse_error(result):
+    return result.returncode == 1 and reaction(result.stderr) == "haa?"
+
+
+def compare_results(reference, compilation, execution):
+    if is_parse_error(reference):
+        return (1, b"", "haa? haa?"), result_summary(compilation)
+    if compilation.returncode != 0:
+        return ("compilation succeeded",), ("compilation failed", *result_summary(compilation))
+    return result_summary(reference), result_summary(execution)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--yahac", help="native yahac command (default: interpreted yahac.yaha)")
@@ -157,14 +173,9 @@ def main():
             src.write_bytes(source)
             ref = run([str(INTERP), "run", str(src), "--lang", lang], stdin)
             exe, comp = compile_c(yahac, source, tmp, f"case{index}")
-            if exe is None:
-                got = (comp.returncode, b"", "haa?")
-            else:
-                out = run([str(exe)], stdin)
-                got = (out.returncode, out.stdout, reaction(out.stderr))
-            want = (ref.returncode, ref.stdout, reaction(ref.stderr))
-            if exe is None and ref.returncode != 0 and reaction(ref.stderr) == "haa?":
-                want = (comp.returncode, b"", "haa?")  # both rejected at compile time
+            needs_execution = exe is not None and not is_parse_error(ref)
+            out = run([str(exe)], stdin) if needs_execution else None
+            want, got = compare_results(ref, comp, out)
             ok = got == want
             failures += not ok
             print(f"{'ok  ' if ok else 'FAIL'} {name}")
