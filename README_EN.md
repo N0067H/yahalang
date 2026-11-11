@@ -308,6 +308,21 @@ Array literals and symbol commands remain supported.
 
 Separate array literal elements with commas. `[hayaha yaha, hayaha ppuru yaha]` creates `[0, 1]`. Arrays cannot contain other arrays.
 
+## Execution step limit
+
+Pass `--max-steps N` to `run` or `repl` to execute at most N instructions. Omitting the option keeps execution unlimited; zero allows no instructions.
+
+```sh
+cargo run -- run examples/truth_machine.yaha --lang ko --max-steps 1000 --error-style friendly
+cargo run -- repl --lang en --max-steps 1000 --error-style friendly
+```
+
+A number or array literal counts as one instruction regardless of its length. Loop condition checks and loop-end instructions count on every visit; skipped code does not count. If another instruction remains after N instructions, execution stops with an error before it runs. Previous stack changes, array mutations, and I/O are preserved.
+
+The REPL starts a new budget for each complete submission and accepts further code after a limit error. Use `:stack` to inspect the remaining stack. REPL commands such as `:stack` and `:reset` do not count.
+
+With `--trace`, the blocked instruction produces an `error` entry. The default diagnostic is `haa? haa?`; `--error-style friendly` reports `execution step limit exceeded`. This option applies to the interpreter, not generated C executables. It does not limit time spent waiting for input or memory usage.
+
 ## REPL
 
 Complete submissions execute immediately, and the stack and arrays remain available for the next submission. Unfinished numbers, arrays, blocks, and phrases continue at the `...>` prompt without executing until complete.

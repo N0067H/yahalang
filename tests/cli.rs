@@ -422,3 +422,67 @@ fn documented_trace_example_matches_the_displayed_log() {
         "{trace}"
     );
 }
+
+#[test]
+fn run_step_limit_stops_infinite_loops_and_reports_trace_location() {
+    let source = temp_source("hayaha ppuru yaha\niya yadayada\nura yadayada");
+    let output = Command::new(env!("CARGO_BIN_EXE_yahalang"))
+        .arg("run")
+        .arg(&source)
+        .args([
+            "--lang",
+            "en",
+            "--max-steps",
+            "4",
+            "--trace",
+            "--error-style",
+            "friendly",
+        ])
+        .output()
+        .unwrap();
+    fs::remove_file(source).unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains(":3:1 error \"ura yadayada\" stack=[1]"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("runtime error at line 3, instruction 1: execution step limit exceeded"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn repl_step_limit_recovers_and_renews_budget_per_submission() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_yahalang"))
+        .args([
+            "repl",
+            "--lang",
+            "en",
+            "--max-steps",
+            "3",
+            "--error-style",
+            "friendly",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(
+        b"hayaha ppuru yaha\niya yadayada\nura yadayada\n:stack\n:reset\nhayaha ppuruppuru yaha\niiiiyaha ppururu\n:q\n"
+    ).unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("[1]"), "{stdout}");
+    assert!(stdout.contains("2\n"), "{stdout}");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert_eq!(
+        stderr.matches("execution step limit exceeded").count(),
+        1,
+        "{stderr}"
+    );
+}

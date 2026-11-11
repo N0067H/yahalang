@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use clap::{Parser, Subcommand, ValueEnum};
-use yahalang::executor::{ExecutionState, TraceEvent, TraceStatus};
+use clap::{Args, Parser, Subcommand, ValueEnum};
+use yahalang::executor::{ExecutionState, RuntimeError, TraceEvent, TraceStatus};
 use yahalang::language::Language;
 use yahalang::lexer::lex;
 use yahalang::parser::{Program, parse, parse_with_spans};
@@ -28,8 +28,8 @@ enum Command {
         lang: Option<CliLanguage>,
         #[arg(long, value_enum, default_value = "usagi")]
         error_style: ErrorStyle,
-        #[arg(long, help = "Trace source locations and stack changes to stderr")]
-        trace: bool,
+        #[command(flatten)]
+        options: ExecutionOptions,
     },
     #[command(about = "Run a program from a source file")]
     Run {
@@ -38,8 +38,8 @@ enum Command {
         lang: Option<CliLanguage>,
         #[arg(long, value_enum, default_value = "usagi")]
         error_style: ErrorStyle,
-        #[arg(long, help = "Trace source locations and stack changes to stderr")]
-        trace: bool,
+        #[command(flatten)]
+        options: ExecutionOptions,
     },
     #[command(about = "Save a default setting")]
     Set {
@@ -47,6 +47,18 @@ enum Command {
         #[arg(value_enum)]
         language: CliLanguage,
     },
+}
+
+#[derive(Debug, Clone, Copy, Default, Args)]
+struct ExecutionOptions {
+    #[arg(long, help = "Trace source locations and stack changes to stderr")]
+    trace: bool,
+    #[arg(
+        long,
+        value_name = "N",
+        help = "Limit executed instructions per program or REPL submission"
+    )]
+    max_steps: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -98,19 +110,19 @@ fn dispatch(command: Command) -> Result<(), String> {
         Command::Repl {
             lang,
             error_style,
-            trace,
+            options,
         } => selected_language(lang)
             .and_then(|language| {
-                repl(language, error_style, trace).map_err(|error| error.to_string())
+                repl(language, error_style, options).map_err(|error| error.to_string())
             })
             .map_err(|error| format!("yahalang: {error}")),
         Command::Run {
             file,
             lang,
             error_style,
-            trace,
+            options,
         } => selected_language(lang)
-            .and_then(|language| run_file(&file, language, error_style, trace))
+            .and_then(|language| run_file(&file, language, error_style, options))
             .map_err(|error| format!("{}: {error}", file.display())),
         Command::Set { key, language } => {
             save_setting(&key, language).map_err(|error| format!("yahalang: {error}"))
@@ -278,7 +290,7 @@ fn run_file(
     file: &PathBuf,
     language: Language,
     error_style: ErrorStyle,
-    trace: bool,
+    options: ExecutionOptions,
 ) -> Result<(), String> {
     let source = fs::read_to_string(file).map_err(|error| error.to_string())?;
     let program = compile(&source, language, error_style)?;
@@ -292,19 +304,19 @@ fn run_file(
             &mut ExecutionState::default(),
             &mut stdin.lock(),
             &mut stdout.lock(),
-            trace,
+            options,
         )
         .map_err(|error| format_runtime_error(error, error_style))
 }
 
-fn repl(language: Language, error_style: ErrorStyle, trace: bool) -> io::Result<()> {
+fn repl(language: Language, error_style: ErrorStyle, options: ExecutionOptions) -> io::Result<()> {
     let stdin = io::stdin();
     let stdout = io::stdout();
     let mut input = stdin.lock();
     let mut output = stdout.lock();
     let mut line = String::new();
     let mut session = ReplSession {
-        trace,
+        options,
         ..ReplSession::default()
     };
 
@@ -339,7 +351,7 @@ fn repl(language: Language, error_style: ErrorStyle, trace: bool) -> io::Result<
 struct ReplSession {
     state: ExecutionState,
     source: String,
-    trace: bool,
+    options: ExecutionOptions,
 }
 
 impl ReplSession {
@@ -380,7 +392,7 @@ impl ReplSession {
             &mut self.state,
             input,
             output,
-            self.trace,
+            self.options,
         )? {
             self.source.clear();
         }
@@ -395,7 +407,7 @@ fn run_repl_source<R: BufRead, W: Write>(
     state: &mut ExecutionState,
     input: &mut R,
     output: &mut W,
-    trace: bool,
+    options: ExecutionOptions,
 ) -> io::Result<bool> {
     let incomplete = lex(source, language)
         .ok()
@@ -414,7 +426,7 @@ fn run_repl_source<R: BufRead, W: Write>(
     };
 
     let mut repl_output = ReplOutput::new(output);
-    let result = program.execute(source, "<repl>", state, input, &mut repl_output, trace);
+    let result = program.execute(source, "<repl>", state, input, &mut repl_output, options);
 
     if repl_output
         .last_byte
@@ -479,9 +491,10 @@ impl CompiledProgram {
         state: &mut ExecutionState,
         input: &mut R,
         output: &mut W,
-        trace: bool,
-    ) -> Result<(), yahalang::executor::RuntimeError> {
-        if !trace {
+        options: ExecutionOptions,
+    ) -> Result<(), RuntimeError> {
+        state.set_step_limit(options.max_steps);
+        if !options.trace {
             return state.execute(&self.program, input, output);
         }
         let locations = trace_locations(source, &self.spans);
@@ -569,7 +582,7 @@ fn compile(
         })
 }
 
-fn format_runtime_error(error: yahalang::executor::RuntimeError, style: ErrorStyle) -> String {
+fn format_runtime_error(error: RuntimeError, style: ErrorStyle) -> String {
     match style {
         ErrorStyle::Usagi => error.to_string(),
         ErrorStyle::Friendly => format!(

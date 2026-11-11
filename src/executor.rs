@@ -73,9 +73,14 @@ type TraceObserver<'a> = dyn FnMut(TraceEvent<'_>) -> std::io::Result<()> + 'a;
 #[derive(Default)]
 pub struct ExecutionState {
     stack: Vec<Value>,
+    max_steps: Option<u64>,
 }
 
 impl ExecutionState {
+    pub fn set_step_limit(&mut self, max_steps: Option<u64>) {
+        self.max_steps = max_steps;
+    }
+
     pub fn reset(&mut self) {
         self.stack.clear();
     }
@@ -94,7 +99,14 @@ impl ExecutionState {
     where
         F: FnMut(TraceEvent<'_>) -> std::io::Result<()>,
     {
-        execute_with_stack(program, &mut self.stack, input, output, Some(&mut observer))
+        execute_with_stack(
+            program,
+            &mut self.stack,
+            input,
+            output,
+            Some(&mut observer),
+            self.max_steps,
+        )
     }
 
     pub fn execute<R: BufRead, W: Write>(
@@ -103,7 +115,14 @@ impl ExecutionState {
         input: &mut R,
         output: &mut W,
     ) -> Result<(), RuntimeError> {
-        execute_with_stack(program, &mut self.stack, input, output, None)
+        execute_with_stack(
+            program,
+            &mut self.stack,
+            input,
+            output,
+            None,
+            self.max_steps,
+        )
     }
 }
 
@@ -121,6 +140,7 @@ fn execute_with_stack<R: BufRead, W: Write>(
     input: &mut R,
     output: &mut W,
     mut observer: Option<&mut TraceObserver<'_>>,
+    mut remaining: Option<u64>,
 ) -> Result<(), RuntimeError> {
     let instructions: Vec<_> = program
         .lines
@@ -136,6 +156,15 @@ fn execute_with_stack<R: BufRead, W: Write>(
     let mut pc = 0;
 
     while let Some(&(line, index, instruction)) = instructions.get(pc) {
+        let entry = (pc, line, index, instruction);
+        if let Err(message) = consume_step(&mut remaining) {
+            notify_trace(&mut observer, entry, stack, TraceStatus::Error(message))?;
+            return Err(RuntimeError {
+                line,
+                instruction: index,
+                message: message.to_owned(),
+            });
+        }
         pc = execute_step(
             (pc, line, index, instruction),
             instructions.len(),
@@ -146,6 +175,17 @@ fn execute_with_stack<R: BufRead, W: Write>(
         )?;
     }
 
+    Ok(())
+}
+
+fn consume_step(remaining: &mut Option<u64>) -> Result<(), &'static str> {
+    let Some(steps) = remaining else {
+        return Ok(());
+    };
+    if *steps == 0 {
+        return Err("execution step limit exceeded");
+    }
+    *steps -= 1;
     Ok(())
 }
 
