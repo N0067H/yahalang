@@ -1,21 +1,6 @@
 use crate::language::Language;
 use crate::token::{Span, Token, TokenKind};
 
-const UTTERANCES: &[TokenKind] = &[
-    TokenKind::Hayaha,
-    TokenKind::Haa,
-    TokenKind::Ura,
-    TokenKind::Yaha,
-    TokenKind::Ppuru,
-    TokenKind::Ppururu,
-    TokenKind::Iiiiyaha,
-    TokenKind::Urara,
-    TokenKind::Iya,
-    TokenKind::Yada,
-    TokenKind::Hat,
-    TokenKind::Yat,
-];
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LexError {
     pub span: Span,
@@ -94,7 +79,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn utterance(&self, rest: &str, first: char) -> Result<(TokenKind, usize), LexError> {
-        if let Some((kind, spelling)) = Self::matching_utterance(rest, self.language) {
+        if let Some((kind, spelling)) = Self::matching_utterance(rest, first, self.language) {
             return Ok((kind, spelling.len()));
         }
 
@@ -107,12 +92,23 @@ impl<'a> Lexer<'a> {
         })
     }
 
-    fn matching_utterance(rest: &str, language: Language) -> Option<(TokenKind, &'static str)> {
-        UTTERANCES
+    fn matching_utterance(
+        rest: &str,
+        first: char,
+        language: Language,
+    ) -> Option<(TokenKind, &'static str)> {
+        let candidates: &[TokenKind] = match first {
+            'h' | '하' | '핫' | 'ハ' => &[TokenKind::Hayaha, TokenKind::Haa, TokenKind::Hat],
+            'y' | '야' | '얏' | 'ヤ' => &[TokenKind::Yaha, TokenKind::Yada, TokenKind::Yat],
+            'p' | '뿌' | 'プ' => &[TokenKind::Ppururu, TokenKind::Ppuru],
+            'i' | '이' | 'イ' => &[TokenKind::Iiiiyaha, TokenKind::Iya],
+            'u' | '우' | 'ウ' => &[TokenKind::Urara, TokenKind::Ura],
+            _ => return None,
+        };
+        candidates
             .iter()
             .filter_map(|kind| kind.spelling(language).map(|spelling| (*kind, spelling)))
-            .filter(|(_, spelling)| rest.starts_with(spelling))
-            .max_by_key(|(_, spelling)| spelling.len())
+            .find(|(_, spelling)| rest.starts_with(spelling))
     }
 }
 
