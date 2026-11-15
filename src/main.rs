@@ -1,3 +1,4 @@
+use std::fmt::{self, Display, Formatter};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
@@ -8,7 +9,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use yahalang::executor::{ExecutionState, RuntimeError, TraceEvent, TraceStatus};
 use yahalang::language::Language;
 use yahalang::lexer::lex;
-use yahalang::parser::{Program, parse, parse_with_spans};
+use yahalang::parser::{Program, parse_with_spans};
 use yahalang::token::Span;
 
 static NEXT_CONFIG_TEMP_FILE: AtomicU64 = AtomicU64::new(0);
@@ -293,7 +294,7 @@ fn run_file(
     options: ExecutionOptions,
 ) -> Result<(), String> {
     let source = fs::read_to_string(file).map_err(|error| error.to_string())?;
-    let program = compile(&source, language, error_style)?;
+    let program = compile(&source, language, error_style).map_err(|error| error.message)?;
     let stdin = io::stdin();
     let stdout = io::stdout();
 
@@ -409,16 +410,9 @@ fn run_repl_source<R: BufRead, W: Write>(
     output: &mut W,
     options: ExecutionOptions,
 ) -> io::Result<bool> {
-    let incomplete = lex(source, language)
-        .ok()
-        .and_then(|tokens| parse(&tokens).err())
-        .is_some_and(|error| error.incomplete);
-    if incomplete {
-        return Ok(false);
-    }
-
     let program = match compile(source, language, error_style) {
         Ok(program) => program,
+        Err(error) if error.incomplete => return Ok(false),
         Err(error) => {
             eprintln!("{error}");
             return Ok(true);
@@ -555,19 +549,34 @@ fn write_trace<W: Write>(
     writer.flush()
 }
 
+struct CompilationError {
+    message: String,
+    incomplete: bool,
+}
+
+impl Display for CompilationError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
 fn compile(
     source: &str,
     language: Language,
     error_style: ErrorStyle,
-) -> Result<CompiledProgram, String> {
+) -> Result<CompiledProgram, CompilationError> {
     let tokens = lex(source, language).map_err(|error| {
         let (line, column) = location(source, error.span.start);
-        match error_style {
+        let message = match error_style {
             ErrorStyle::Usagi => format!("{line}:{column}: {error}"),
             ErrorStyle::Friendly => format!(
                 "{line}:{column}: unexpected character {:?}",
                 error.character
             ),
+        };
+        CompilationError {
+            message,
+            incomplete: false,
         }
     })?;
 
@@ -575,9 +584,13 @@ fn compile(
         .map(|(program, spans)| CompiledProgram { program, spans })
         .map_err(|error| {
             let (line, column) = location(source, error.span.start);
-            match error_style {
+            let message = match error_style {
                 ErrorStyle::Usagi => format!("{line}:{column}: {error}"),
                 ErrorStyle::Friendly => format!("{line}:{column}: {}", error.message),
+            };
+            CompilationError {
+                message,
+                incomplete: error.incomplete,
             }
         })
 }
